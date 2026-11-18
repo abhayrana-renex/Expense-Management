@@ -366,6 +366,8 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; }
 .bill-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 40%); gap: 14px;
   align-items: start; }
 .bill-form { min-width: 0; }
+/* One bill: no box inside the card - bill, details and preview read as one section. */
+.card-body > .line:only-child { border: 0; padding: 0; background: none; }
 .bill-side { position: sticky; top: 62px; min-width: 0; }
 .bill-side .bill-preview { height: clamp(360px, calc(100vh - 150px), 640px); }
 .bill-line .tax-grid { grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); }

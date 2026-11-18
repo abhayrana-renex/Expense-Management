@@ -75,6 +75,7 @@ export function ExpenseForm() {
   const [baseDocs, setBaseDocs] = useState<StagedFile[]>([]);
   const [title, setTitle] = useState("");
   const titleTouched = useRef(false);
+  const purposeTouched = useRef(false);
   const [manual, setManual] = useState(false);
   const [purpose, setPurpose] = useState("");
   const [typeId, setTypeId] = useState("");
@@ -100,6 +101,7 @@ export function ExpenseForm() {
     if (!e || loaded.current) return;
     loaded.current = true;
     titleTouched.current = true;
+    purposeTouched.current = true;
     setBillType(e.bill_type ?? "PO"); setDetails(detailsOf(e));
     setBaseDocs(e.base_documents.map((d) => ({ id: d.id, name: d.original_filename,
       content_type: d.content_type })));
@@ -118,6 +120,7 @@ export function ExpenseForm() {
     if (editing || !src || loaded.current) return;
     loaded.current = true;
     titleTouched.current = true;
+    purposeTouched.current = true;
     setBillType(src.bill_type ?? "PO"); setDetails(detailsOf(src));
     setTitle(`${src.title} (copy)`.slice(0, 200)); setPurpose(src.purpose ?? "");
     setTypeId(String(src.expense_type.id)); setBranchId(String(src.branch.id));
@@ -165,7 +168,11 @@ export function ExpenseForm() {
       const cat = read.map((l) => l.fields?.expense_type_id?.value).find(Boolean);
       if (cat) setTypeId(String(cat));
     }
-  }, [lines, typeId]);
+    if (!purposeTouched.current && !purpose) {
+      const what = read.map((l) => l.fields?.description?.value).find(Boolean);
+      if (what) setPurpose(String(what).slice(0, 2000));
+    }
+  }, [lines, typeId, purpose]);
 
   /** PO bills: upload invoices, read them (QR + PDF text + OCR), one pre-filled line each. */
   async function readBills(files: File[]) {
@@ -346,6 +353,56 @@ export function ExpenseForm() {
 
   if (editing && existing.isLoading) return <Skeleton rows={8} />;
 
+
+  // Bills on screen: the claim details sit under the first bill, left of its preview.
+  const showLines = !(isPo && !hasBills && !manual);
+  const claimFields = (
+    <>
+      <Field label="Title" full>
+        <input className="input" value={title} maxLength={200}
+          placeholder={billType === "ADHOC" ? "e.g. Claude Pro subscription - Nov" : "e.g. Laptop repair"}
+          onChange={(e) => { titleTouched.current = true; setTitle(e.target.value); }} />
+      </Field>
+      <Field label="Category">
+        <Select className="select" value={typeId} onChange={(e) => setTypeId(e.target.value)}>
+          <option value="">Select category</option>
+          {types.data?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </Select>
+      </Field>
+      <Field label="Department" hint="Approvals follow this department">
+        <Select className="select" value={deptId} onChange={(e) => setDeptId(e.target.value)}>
+          <option value="">Select department</option>
+          {departments.data?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </Select>
+      </Field>
+      <Field label="Branch">
+        <Select className="select" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+          <option value="">Select branch</option>
+          {branches.data?.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.code})</option>)}
+        </Select>
+      </Field>
+      <Field label="Cost centre" hint="Optional">
+        <Select className="select" value={centreId} onChange={(e) => setCentreId(e.target.value)}>
+          <option value="">None</option>
+          {centres.data?.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+        </Select>
+      </Field>
+      <Field label="Bill period from" hint={periodSource || "Optional - billing / service period"}>
+        <input className="input" type="date" value={periodFrom}
+          onChange={(e) => {
+            periodTouched.current = true; setPeriodSource(""); setPeriodFrom(e.target.value);
+          }} />
+      </Field>
+      <Field label="Bill period to" hint={periodLength(periodFrom, periodTo)}>
+        <input className="input" type="date" min={periodFrom || undefined} value={periodTo}
+          onChange={(e) => { periodTouched.current = true; setPeriodSource(""); setPeriodTo(e.target.value); }} />
+      </Field>
+      <Field label="Business purpose" full>
+        <textarea className="textarea" style={{ minHeight: 44 }} value={purpose} maxLength={2000}
+          onChange={(e) => { purposeTouched.current = true; setPurpose(e.target.value); }} />
+      </Field>
+    </>
+  );
   return (
     <>
       <PageHead title={editing ? `Edit ${existing.data?.expense_no}` : "New expense"}
@@ -443,7 +500,7 @@ export function ExpenseForm() {
         </div>
 
         <div className="card">
-          <div className="card-head"><h3>Bills</h3>
+          <div className="card-head"><h3>{showLines ? "Bill & details" : "Bills"}</h3>
             <span className="sub">{isPo ? "Upload the invoices - we read the company, GSTIN, bill no., "
               + "date and GST for you to check" : "Invoice numbers are checked against every claim "
               + "from the same company"}</span></div>
@@ -460,6 +517,7 @@ export function ExpenseForm() {
               <BillLine key={l.key} line={l} index={idx} vendors={vendors.data ?? []}
                 rates={rates.data ?? []} expenseId={editing ? Number(id) : undefined}
                 canRemove={lines.length > 1} onChange={(patch) => update(l.key, patch)}
+                extra={idx === 0 ? claimFields : undefined}
                 onRemove={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
                 attach={isPo && !l.docs.length
                   ? <AttachButton small label="Read bill" onRead={(r) => readInto(l.key, r)} />
@@ -471,56 +529,14 @@ export function ExpenseForm() {
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-head"><h3>Details</h3></div>
-          <div className="card-body form-grid form-grid-4">
-            <Field label="Title" full>
-              <input className="input" value={title} maxLength={200}
-                placeholder={billType === "ADHOC" ? "e.g. Claude Pro subscription - Nov" : "e.g. Laptop repair"}
-                onChange={(e) => { titleTouched.current = true; setTitle(e.target.value); }} />
-            </Field>
-            <Field label="Category">
-              <Select className="select" value={typeId} onChange={(e) => setTypeId(e.target.value)}>
-                <option value="">Select category</option>
-                {types.data?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </Select>
-            </Field>
-            <Field label="Department" hint="Approvals follow this department">
-              <Select className="select" value={deptId} onChange={(e) => setDeptId(e.target.value)}>
-                <option value="">Select department</option>
-                {departments.data?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </Select>
-            </Field>
-            <Field label="Branch">
-              <Select className="select" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
-                <option value="">Select branch</option>
-                {branches.data?.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.code})</option>)}
-              </Select>
-            </Field>
-            <Field label="Cost centre" hint="Optional">
-              <Select className="select" value={centreId} onChange={(e) => setCentreId(e.target.value)}>
-                <option value="">None</option>
-                {centres.data?.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
-              </Select>
-            </Field>
-            <Field label="Bill period from" hint={periodSource || "Optional - billing / service period"}>
-              <input className="input" type="date" value={periodFrom}
-                onChange={(e) => {
-                  periodTouched.current = true; setPeriodSource(""); setPeriodFrom(e.target.value);
-                }} />
-            </Field>
-            <Field label="Bill period to" hint={periodLength(periodFrom, periodTo)}>
-              <input className="input" type="date" min={periodFrom || undefined} value={periodTo}
-                onChange={(e) => { periodTouched.current = true; setPeriodSource(""); setPeriodTo(e.target.value); }} />
-            </Field>
-            <Field label="Business purpose" full>
-              <textarea className="textarea" style={{ minHeight: 44 }} value={purpose} maxLength={2000}
-                onChange={(e) => setPurpose(e.target.value)} />
-            </Field>
+        {!showLines && (
+          <div className="card">
+            <div className="card-head"><h3>Details</h3></div>
+            <div className="card-body form-grid form-grid-4">{claimFields}</div>
           </div>
-        </div>
+        )}
 
-        {!(isPo && !hasBills && !manual) && (
+        {showLines && (
           <div className="card add-more"><div className="card-body">
             <div className="row" style={{ alignItems: "stretch" }}>
               {isPo && hasBills && (

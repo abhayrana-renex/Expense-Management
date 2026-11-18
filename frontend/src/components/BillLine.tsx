@@ -263,7 +263,7 @@ function useInvoiceCheck(line: Line, expenseId: number | undefined,
 }
 
 export function BillLine({ line, index, vendors, rates, canRemove, onChange, onRemove, attach,
-  expenseId, showRates = false }: {
+  expenseId, showRates = false, extra }: {
   line: Line; index: number; vendors: MasterRow[]; rates: GstRate[]; canRemove: boolean;
   onChange: (patch: Partial<Line>) => void; onRemove: () => void;
   /** Upload control shown in the line header. */
@@ -272,6 +272,9 @@ export function BillLine({ line, index, vendors, rates, canRemove, onChange, onR
   expenseId?: number;
   /** Show the GST rate dropdowns (Finance correction). Off on Add expense: amounts only. */
   showRates?: boolean;
+  /** More fields in the same grid as the bill's own (the claim details on Add expense), so
+   *  the bill and its details are one section, above the amounts and the "I have checked" box. */
+  extra?: ReactNode;
 }) {
   const otherCompanies = useInvoiceCheck(line, expenseId, onChange);
   const vendorRow = vendors.find((v) => String(v.id) === line.vendor_id);
@@ -362,6 +365,7 @@ export function BillLine({ line, index, vendors, rates, canRemove, onChange, onR
         <div className="full"><LField line={line} name="description" label="Description">
           <input className="input" value={line.description} maxLength={500}
             onChange={(e) => onChange({ description: e.target.value })} /></LField></div>
+        {extra}
       </div>
       <div className="tax-grid">
         <LField line={line} name="taxable_amount" label="Amount (pre-tax)">
