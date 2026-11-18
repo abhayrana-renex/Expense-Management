@@ -1,0 +1,39 @@
+# Secrets - never commit
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+backend/venv/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Runtime data
+backend/uploads/
+backend/logs/
+*.dump
+
+# Node
+node_modules/
+frontend/dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Database backups (contain real data)
+backend/backups/
+*.dump
+
+# Local only - real people / internal notes (never commit)
+backend/org_setup.local.json
+*.local.json
+FAR-master-data-report.md

@@ -1,0 +1,22 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["alembic/versions", "venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N"]
+# B008: FastAPI's Depends()/Query() in defaults is the framework idiom.
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning:jose.*"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/cli.py"]
+
+[tool.ruff.lint.per-file-ignores]
+# Sample bill texts reproduce real bill lines verbatim.
+"tests/bill_samples.py" = ["E501"]
