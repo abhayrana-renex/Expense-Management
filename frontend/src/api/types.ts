@@ -295,6 +295,18 @@ export interface ExtractedField {
   label?: string | null;
 }
 
+/** POST /bills/read-email: an Outlook .msg / saved .eml and the bills read from it. */
+export interface EmailRead {
+  email: { kind: "msg" | "eml"; subject: string; sender: string; sent_at: string | null;
+    document: BillRead["document"] };
+  bills: BillRead[];
+  from_email_text: boolean;
+  skipped: { name: string; reason: string; quiet: boolean }[];
+}
+
+/** Only these are ever shown inline; e-mails and anything else are downloads. */
+export const PREVIEWABLE = ["application/pdf", "image/jpeg", "image/png"];
+
 export interface BillRead {
   document: { id: number; original_filename: string; content_type: string; size_bytes: number;
     sha256: string; uploaded_at: string };

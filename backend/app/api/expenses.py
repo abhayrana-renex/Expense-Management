@@ -84,9 +84,13 @@ def _file_response(doc, disposition: str = "attachment") -> StreamingResponse:
     safe_name = (
         "".join(c for c in doc.original_filename if c.isalnum() or c in "._- ") or "bill.pdf"
     )
+    # Only PDF / JPG / PNG may ever be shown inline; e-mails etc. are opaque downloads.
+    previewable = doc.content_type in document_service.PREVIEWABLE
+    if not previewable:
+        disposition = "attachment"
     return StreamingResponse(
         document_service.stream(doc),
-        media_type=doc.content_type,
+        media_type=doc.content_type if previewable else "application/octet-stream",
         headers={
             # Inline (signed) bills may be shown in the portal's own preview frame only.
             **(

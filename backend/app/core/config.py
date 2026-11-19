@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     # ---------- Files ----------
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 10
+    # Outlook .msg / .eml e-mails carrying bills (attachments are still MAX_UPLOAD_SIZE_MB)
+    MAX_EMAIL_SIZE_MB: int = 25
+    EMAIL_MAX_BILLS: int = 10
+    # Bill uploads (each one may run OCR) per person per minute
+    BILL_READ_RATE_LIMIT_PER_MINUTE: int = 40
     SIGNED_URL_TTL_SECONDS: int = 60
 
     # ---------- HTTP ----------
@@ -110,6 +115,10 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return self.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+    @property
+    def max_email_bytes(self) -> int:
+        return self.MAX_EMAIL_SIZE_MB * 1024 * 1024
 
     @property
     def is_production(self) -> bool:

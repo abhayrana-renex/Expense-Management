@@ -5,11 +5,12 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronRight, Plus, Send } from "lucide-react";
 import { api, ApiError } from "../api/client";
 import type {
-  BillRead, BillType, Expense, GstRate, RouteStepPreview, ValidationIssue,
+  BillRead, BillType, EmailRead, Expense, GstRate, RouteStepPreview, ValidationIssue,
 } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import {
-  BillDropzone, BillLine, blankLine, GSTIN_RE, lineFromBill, MONEY_RE, msmeIn, msmeOut,
+  BillDropzone, BillLine, blankLine, EMAIL_FILE_RE, GSTIN_RE, lineFromBill, MONEY_RE, msmeIn,
+  msmeOut,
 } from "../components/BillLine";
 import type { Line } from "../components/BillLine";
 import { AttachButton, BILL_TYPES, BillTypePicker, FileChip } from "../components/BillType";
@@ -186,6 +187,19 @@ export function ExpenseForm() {
       for (let job = queue.shift(); job; job = queue.shift()) {
         const current = job;
         try {
+          if (EMAIL_FILE_RE.test(current.file.name)) {
+            const res = await api.upload<EmailRead>("/bills/read-email", current.file);
+            const filled = linesFromEmail(res);
+            setLines((ls) => ls.flatMap((l) => (l.key === current.key ? filled : [l])));
+            const loud = res.skipped.filter((s) => !s.quiet);
+            if (!filled.length) {
+              toast(`${current.file.name}: no bill found in this e-mail${loud.length
+                ? ` (${loud.map((s) => `${s.name}: ${s.reason}`).join("; ")})` : ""}`, "error");
+            } else if (loud.length) {
+              toast(`${loud.length} attachment(s) not read - see the bill's notes`);
+            }
+            continue;
+          }
           const res = await api.upload<BillRead>("/bills/read", current.file);
           const filled = lineFromBill(res);
           setLines((ls) => ls.map((l) => (l.key === current.key ? { ...filled, key: l.key } : l)));
@@ -196,6 +210,31 @@ export function ExpenseForm() {
       }
     };
     await Promise.all(Array.from({ length: Math.min(PARALLEL_READS, files.length) }, worker));
+  }
+
+  /** One line per bill read from an e-mail; the original e-mail is kept on the first line
+   *  (as evidence) together with where it came from and what was not read. */
+  function linesFromEmail(res: EmailRead): Line[] {
+    const m = res.email;
+    const from = `From the e-mail “${m.subject || "(no subject)"}”${m.sender ? ` - ${m.sender}` : ""}`
+      + (m.sent_at ? `, ${new Date(m.sent_at).toLocaleDateString("en-IN")}` : "");
+    const notes = [
+      from,
+      ...(res.from_email_text ? ["No bill was attached: read from the e-mail's own text. "
+        + "Check every amount."] : []),
+      ...res.skipped.filter((s) => !s.quiet).map((s) => `Not read: ${s.name} - ${s.reason}`),
+    ];
+    return res.bills.map((b, i) => {
+      const line = lineFromBill(b);
+      if (i > 0) return { ...line, warnings: [from, ...(line.warnings ?? [])] };
+      return {
+        ...line,
+        warnings: [...notes, ...(line.warnings ?? [])],
+        document_ids: [...line.document_ids, m.document.id],
+        docs: [...line.docs, { id: m.document.id, name: m.document.original_filename,
+          content_type: m.document.content_type }],
+      };
+    });
   }
 
   /** Read a bill into an existing (usually empty) line, keeping the line's identity. */
@@ -486,7 +525,8 @@ export function ExpenseForm() {
             )}
             {billType !== "PO" && (
               <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
-                <AttachButton label={billType === "ADHOC" ? "Attach approval e-mail" : "Attach contract / MSA"}
+                <AttachButton allowEmail={billType === "ADHOC"}
+                  label={billType === "ADHOC" ? "Attach approval e-mail" : "Attach contract / MSA"}
                   onUploaded={(f) => setBaseDocs((d) => [...d, f])} />
                 {baseDocs.map((d) => <FileChip key={d.id} file={d}
                   onRemove={() => setBaseDocs((ds) => ds.filter((x) => x.id !== d.id))} />)}

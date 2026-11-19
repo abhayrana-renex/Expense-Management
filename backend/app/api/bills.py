@@ -1,5 +1,6 @@
 """Bill reader: upload a bill first, get pre-filled fields to check, then create the expense."""
 
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
@@ -47,6 +48,27 @@ class BillReadResult(BaseModel):
     extraction: Extraction | None
 
 
+class EmailInfo(BaseModel):
+    kind: str
+    subject: str
+    sender: str
+    sent_at: datetime | None
+    document: BillDocument
+
+
+class SkippedFile(BaseModel):
+    name: str
+    reason: str
+    quiet: bool = False
+
+
+class EmailReadResult(BaseModel):
+    email: EmailInfo
+    bills: list[BillReadResult]
+    from_email_text: bool
+    skipped: list[SkippedFile]
+
+
 FIELD_DOC = (
     "Fields (each {value, confidence 0-1, source}): vendor_name, vendor_gstin, vendor_pan, "
     "vendor_state, vendor_id (FAR vendor match), buyer_gstin, invoice_number, invoice_date, "
@@ -72,7 +94,8 @@ def read_bill(
     read: bool = Query(
         True,
         description="false = just store the file (approval e-mail, contract, or a bill the "
-        "person types in by hand); `extraction` is then null",
+        "person types in by hand); `extraction` is then null. With read=false an Outlook "
+        ".msg / .eml (e.g. the approval e-mail itself) is accepted as well",
     ),
     principal: Principal = Depends(can_create),
     db: Session = Depends(get_db),
@@ -80,9 +103,33 @@ def read_bill(
     # Sync on purpose: OCR is CPU-bound, so FastAPI runs this in a worker thread instead of
     # blocking the event loop for every other user.
     data = file.file.read(settings.max_upload_bytes + 1)
+    service.rate_check(principal)
     if not read:
         return service.store_only(db, principal, file.filename or "", data)
     return service.extract_new_bill(db, principal, file.filename or "", data)
+
+
+@router.post(
+    "/read-email",
+    response_model=EmailReadResult,
+    status_code=201,
+    summary="Upload an Outlook e-mail (.msg) or saved e-mail (.eml) and read its bills",
+    description=f"Max {settings.MAX_EMAIL_SIZE_MB} MB. Every PDF / JPG / PNG attachment "
+    f"(by content, up to {settings.EMAIL_MAX_BILLS}) is stored and read like `/bills/read`; "
+    "logos and signature pictures are ignored; other files are listed in `skipped` with the "
+    "reason. With no bill attached, the e-mail's own text is turned into a PDF and read "
+    "(`from_email_text`). Nothing in the e-mail is executed or fetched (HTML is reduced to "
+    "text). The original e-mail is kept (`email.document`) and is only ever downloadable.",
+    responses={413: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+)
+def read_email(
+    file: UploadFile = File(...),
+    principal: Principal = Depends(can_create),
+    db: Session = Depends(get_db),
+) -> dict:
+    data = file.file.read(settings.max_email_bytes + 1)
+    service.rate_check(principal)
+    return service.import_email(db, principal, file.filename or "", data)
 
 
 @router.get(

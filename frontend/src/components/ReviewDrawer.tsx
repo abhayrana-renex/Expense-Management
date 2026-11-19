@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import type { AllowedActions, Expense, ValidationIssue } from "../api/types";
+import { PREVIEWABLE } from "../api/types";
 import { date, inr, sumMoney } from "../lib/format";
 import { BillTypeInfo } from "./BillType";
 import { Tracker } from "./Tracker";
@@ -13,13 +14,23 @@ import { Avatar, ErrorAlert, StatusPill } from "./ui";
 
 function Preview({ docId, type }: { docId: number; type: string }) {
   const [url, setUrl] = useState<string | null>(null);
+  const inline = PREVIEWABLE.includes(type);
   useEffect(() => {
+    if (!inline) return;
     let alive = true;
     setUrl(null);
     api.get<{ url: string }>(`/expenses/documents/${docId}/download-url`)
       .then((r) => alive && setUrl(new URL(r.url, api.origin).toString())).catch(() => undefined);
     return () => { alive = false; };
-  }, [docId]);
+  }, [docId, inline]);
+  if (!inline) {
+    return (
+      <div className="bill-preview"><div style={{ textAlign: "center" }}>
+        <p className="muted small">The original e-mail is not shown here.</p>
+        <button className="btn btn-sm" onClick={() => api.openDocument(docId)}>
+          <FileText size={13} />Download e-mail</button></div></div>
+    );
+  }
   if (!url) return <div className="bill-preview"><div className="spinner" /></div>;
   return <div className="bill-preview">{type === "application/pdf"
     ? <iframe title="Bill" src={`${url}#toolbar=0&view=FitH`} /> : <img src={url} alt="Bill" />}</div>;
@@ -105,6 +116,7 @@ export function ReviewDrawer({ expenseId, position, onClose, onDone }: {
                       <button key={d.id} className={`btn btn-sm ${i === docIdx ? "btn-primary" : ""}`}
                         title={d.original_filename} onClick={() => setDocIdx(i)}><FileText size={12} />
                         {d.doc_kind === "APPROVAL" ? "Approval" : d.doc_kind === "CONTRACT" ? "Contract"
+                          : !PREVIEWABLE.includes(d.content_type) ? "E-mail"
                           : `Bill ${i + 1 - (e.base_documents.length)}`}</button>))}
                   </div>
                 )}

@@ -39,8 +39,10 @@ export interface StagedFile { id: number; name: string; content_type: string }
 
 /** Uploads a file. With `onRead` the bill reader (QR + PDF text + OCR) reads it; otherwise it is
  *  only stored (approval e-mail, contract, or a bill typed in by hand). */
-export function AttachButton({ label, onUploaded, onRead, small }: { label: string;
-  onUploaded?: (f: StagedFile) => void; onRead?: (r: BillRead) => void; small?: boolean }) {
+export function AttachButton({ label, onUploaded, onRead, small, allowEmail }: { label: string;
+  onUploaded?: (f: StagedFile) => void; onRead?: (r: BillRead) => void; small?: boolean;
+  /** Also accept an Outlook .msg / saved .eml (the approval e-mail itself). */
+  allowEmail?: boolean }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
@@ -62,7 +64,8 @@ export function AttachButton({ label, onUploaded, onRead, small }: { label: stri
         onClick={() => input.current?.click()}>
         {onRead ? <ScanLine size={small ? 13 : 15} /> : <Paperclip size={small ? 13 : 15} />}
         {busy ? (onRead ? "Reading…" : "Uploading…") : label}</button>
-      <input ref={input} type="file" hidden accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png"
+      <input ref={input} type="file" hidden
+        accept={`application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png${allowEmail ? ",.msg,.eml" : ""}`}
         onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
     </>
   );

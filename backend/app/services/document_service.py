@@ -1,5 +1,6 @@
 """Bill upload, supersede, authenticated download and short-lived signed URLs."""
 
+import re
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import PurePath
@@ -26,6 +27,41 @@ ALLOWED = {
 }
 
 
+# PDF features that run code or carry other files. Bills never need them; a PDF with them is
+# refused (re-print it to PDF). Names may be hex-escaped (/J#61vaScript), so decode first.
+_PDF_ACTIVE = re.compile(rb"/(JavaScript|JS|Launch|EmbeddedFiles?|RichMedia)(?![A-Za-z0-9])")
+_PDF_NAME_HEX = re.compile(rb"#([0-9A-Fa-f]{2})")
+
+
+def pdf_active_content(data: bytes) -> str | None:
+    """The first active-content marker found in a PDF, or None."""
+    names = _PDF_NAME_HEX.sub(lambda m: bytes([int(m.group(1), 16)]), data)
+    hit = _PDF_ACTIVE.search(names)
+    if hit:
+        return hit.group(1).decode()
+    # Markers can also hide inside compressed object streams: check the parsed catalog.
+    try:
+        import pdfplumber
+
+        with pdfplumber.open(__import__("io").BytesIO(data)) as pdf:
+            catalog = pdf.doc.catalog
+            names_tree = catalog.get("Names")
+            names_tree = names_tree.resolve() if hasattr(names_tree, "resolve") else names_tree
+            for key in ("JavaScript", "EmbeddedFiles"):
+                if isinstance(names_tree, dict) and key in names_tree:
+                    return key
+            action = catalog.get("OpenAction")
+            action = action.resolve() if hasattr(action, "resolve") else action
+            if isinstance(action, dict) and str(action.get("S", "")).strip("/'") in (
+                "JavaScript",
+                "Launch",
+            ):
+                return "OpenAction"
+    except Exception:  # noqa: BLE001 - unreadable PDFs are handled by the reader
+        return None
+    return None
+
+
 def validate_bill(filename: str, data: bytes) -> str:
     """Return the detected content type, or raise INVALID_FILE / FILE_TOO_LARGE."""
     if len(data) == 0:
@@ -37,6 +73,13 @@ def validate_bill(filename: str, data: bytes) -> str:
         raise AppError(422, "INVALID_FILE", "Only PDF, JPG or PNG bills are accepted")
     if PurePath(filename).suffix.lower() not in ALLOWED[detected]:
         raise AppError(422, "INVALID_FILE", "File name extension does not match its content")
+    if detected == "application/pdf" and (marker := pdf_active_content(data)):
+        raise AppError(
+            422,
+            "INVALID_FILE",
+            f"This PDF contains active content ({marker}). Print it to PDF (Microsoft Print "
+            "to PDF) and upload that copy.",
+        )
     if not scan_for_malware(data):
         raise AppError(422, "INVALID_FILE", "File failed the malware scan")
     return detected
@@ -66,6 +109,35 @@ def store_bill(
     db.add(doc)
     db.flush()
     return doc
+
+
+def store_email(
+    db: Session, principal: Principal, filename: str, data: bytes, kind: str
+) -> ExpenseDocument:
+    """Keep the original e-mail (.msg / .eml) as evidence for the bills read from it.
+    Validated by email_import.validate before this is called."""
+    from app.services.bills.email_import import EMAIL_TYPES, safe_name
+
+    if not scan_for_malware(data):
+        raise AppError(422, "INVALID_FILE", "File failed the malware scan")
+    content_type, ext = EMAIL_TYPES[kind]
+    key = get_storage().save(data, ext)
+    doc = ExpenseDocument(
+        expense_id=None,
+        item_id=None,
+        original_filename=safe_name(filename, f"e-mail{ext}")[:255],
+        storage_key=key,
+        content_type=content_type,
+        size_bytes=len(data),
+        sha256=sha256_hex(data),
+        uploaded_by_id=principal.user.id,
+    )
+    db.add(doc)
+    db.flush()
+    return doc
+
+
+PREVIEWABLE = set(ALLOWED)
 
 
 def upload(

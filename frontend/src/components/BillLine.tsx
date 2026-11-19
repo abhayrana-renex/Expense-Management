@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, FileText, ScanLine, Trash2, Upload } from "lucide-react";
 import { api } from "../api/client";
 import type { BillRead, ExtractedField, GstRate, InvoiceCheck, MasterRow } from "../api/types";
+import { PREVIEWABLE } from "../api/types";
 import { inr, percentOf, sumMoney, today } from "../lib/format";
 
 export interface Line {
@@ -415,7 +416,7 @@ export function BillLine({ line, index, vendors, rates, canRemove, onChange, onR
         <div className="bill-line">
           <div className="bill-form">{form}</div>
           <div className="bill-side">
-            <Preview doc={line.docs[0]} />
+            <Preview doc={line.docs.find((d) => PREVIEWABLE.includes(d.content_type))} />
             <div className="row small" style={{ marginTop: 6, flexWrap: "wrap" }}>
               {line.docs.map((d) => (
                 <a key={d.id} href="#" className="doc-chip" onClick={(e) => { e.preventDefault();
@@ -428,13 +429,17 @@ export function BillLine({ line, index, vendors, rates, canRemove, onChange, onR
   );
 }
 
+/** Bills, or an Outlook e-mail carrying them (.msg dragged from Outlook, or a saved .eml). */
+export const BILL_FILE_RE = /\.(pdf|jpe?g|png|msg|eml)$/i;
+export const EMAIL_FILE_RE = /\.(msg|eml)$/i;
+
 export function BillDropzone({ onFiles, compact, disabled }: {
   onFiles: (files: File[]) => void; compact?: boolean; disabled?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const pick = (list: FileList | null) => {
-    const files = Array.from(list ?? []).filter((f) => /\.(pdf|jpe?g|png)$/i.test(f.name));
+    const files = Array.from(list ?? []).filter((f) => BILL_FILE_RE.test(f.name));
     if (files.length) onFiles(files);
   };
   return (
@@ -449,9 +454,10 @@ export function BillDropzone({ onFiles, compact, disabled }: {
       <div>
         <h3>{compact ? "Add more bills" : "Drop your bills here, or click to choose"}</h3>
         <p className="muted small" style={{ margin: 0 }}>
-          PDF, JPG or PNG · several at once · we read the vendor, GSTIN, bill no., date and GST for you</p>
+          PDF, JPG, PNG or an <strong>Outlook e-mail</strong> (drag it straight from Outlook)
+          · several at once · we read the vendor, GSTIN, bill no., date and GST for you</p>
       </div>
-      <input ref={input} type="file" hidden multiple accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png"
+      <input ref={input} type="file" hidden multiple accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png,.msg,.eml"
         onChange={(e) => { pick(e.target.files); e.target.value = ""; }} />
     </div>
   );

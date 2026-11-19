@@ -19,7 +19,7 @@ from app.core.deps import Principal
 from app.core.errors import AppError
 from app.models import BillExtraction, ExpenseDocument, ExpenseType, Partner, VendorProfile
 from app.services import audit_service, document_service
-from app.services.bills import parser, qr, reader
+from app.services.bills import email_import, parser, qr, reader
 
 log = logging.getLogger("app.bills")
 ENGINE = "qr+pdfplumber+rapidocr(PP-OCRv4)"
@@ -105,8 +105,15 @@ def _read_and_parse(data: bytes, content_type: str) -> tuple[reader.ReadResult, 
 
 
 def store_only(db: Session, principal: Principal, filename: str, data: bytes) -> dict:
-    """Stage a file without reading it (attach later via document_ids / base_document_ids)."""
-    doc = document_service.store_bill(db, principal, filename, data, None, None)
+    """Stage a file without reading it (attach later via document_ids / base_document_ids).
+    An Outlook .msg / .eml is accepted too (e.g. the ad-hoc approval e-mail itself), with the
+    same e-mail checks as /bills/read-email; it is kept only as a download."""
+    if email_import.EMAIL_SUFFIX.search(filename or "") or data.startswith(email_import.OLE_MAGIC):
+        kind = email_import.validate(filename, data)
+        email_import.parse(kind, data)  # refuse damaged / non-Outlook OLE files up front
+        doc = document_service.store_email(db, principal, filename, data, kind)
+    else:
+        doc = document_service.store_bill(db, principal, filename, data, None, None)
     audit_service.record(
         db,
         "FILE_UPLOADED",
@@ -182,6 +189,76 @@ def extract_new_bill(db: Session, principal: Principal, filename: str, data: byt
     )
     db.commit()
     return serialize(doc, extraction)
+
+
+def rate_check(principal: Principal) -> None:
+    """Uploads run OCR (CPU heavy): cap them per person per minute."""
+    from app.core.rate_limit import limiter
+
+    if not limiter.hit(f"bill-read:{principal.user.id}", settings.BILL_READ_RATE_LIMIT_PER_MINUTE):
+        raise AppError(429, "RATE_LIMITED", "Too many bill uploads - wait a minute and try again")
+
+
+def import_email(db: Session, principal: Principal, filename: str, data: bytes) -> dict:
+    """An Outlook .msg / .eml: every PDF / JPG / PNG attachment is read as a bill; with none,
+    the e-mail's own text is (receipts like cabs and food orders). The original e-mail is kept
+    as evidence and attached to the first bill line by the UI."""
+    if not settings.FEATURE_BILL_READER:
+        raise AppError(404, "NOT_FOUND", "The bill reader is switched off")
+    kind = email_import.validate(filename, data)
+    parsed = email_import.parse(kind, data)
+    original = document_service.store_email(db, principal, filename, data, kind)
+    # The original e-mail and its audit entry are saved together, before any bill is read.
+    audit_service.record(
+        db,
+        "EMAIL_UPLOADED",
+        "expense_document",
+        original.id,
+        actor=principal.user,
+        details={"sha256": original.sha256, "kind": kind, "size": original.size_bytes},
+    )
+    db.commit()
+    bills = email_import.bill_attachments(parsed)
+    from_body = False
+    if not bills:
+        pdf = email_import.body_pdf(parsed)
+        if pdf:
+            stem = email_import.safe_name(parsed.subject, "e-mail")[:80]
+            bills = [(f"{stem} (e-mail text).pdf", pdf)]
+            from_body = True
+    results: list[dict] = []
+    for name, payload in bills:
+        try:
+            results.append(extract_new_bill(db, principal, name, payload))
+        except AppError as err:  # e.g. a PDF with active content: refused before anything
+            parsed.skip(name, err.detail)  # is written, so skip it and keep the rest
+    audit_service.record(
+        db,
+        "EMAIL_IMPORTED",
+        "expense_document",
+        original.id,
+        actor=principal.user,
+        details={
+            "sha256": original.sha256,
+            "kind": kind,
+            "bills": len(results),
+            "from_email_text": from_body,
+            "skipped": len([s for s in parsed.skipped if not s["quiet"]]),
+        },
+    )
+    db.commit()
+    return {
+        "email": {
+            "kind": kind,
+            "subject": parsed.subject,
+            "sender": parsed.sender,
+            "sent_at": parsed.sent_at,
+            "document": serialize(original, None)["document"],
+        },
+        "bills": results,
+        "from_email_text": from_body,
+        "skipped": parsed.skipped,
+    }
 
 
 def serialize(doc: ExpenseDocument, extraction: BillExtraction | None) -> dict:
