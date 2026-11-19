@@ -37,3 +37,4 @@ backend/backups/
 backend/org_setup.local.json
 *.local.json
 FAR-master-data-report.md
+frontend/tsconfig.tsbuildinfo

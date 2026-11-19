@@ -41,8 +41,9 @@ class VendorProfile(Base):
     )
     gstin: Mapped[str | None] = mapped_column(String(15))
     pan: Mapped[str | None] = mapped_column(String(10))
+    # MSME unless someone says otherwise (migration 0010).
     is_msme: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default=text("false")
+        Boolean, nullable=False, default=True, server_default=text("true")
     )
     udyam_number: Mapped[str | None] = mapped_column(String(30))
     updated_at: Mapped[datetime] = mapped_column(

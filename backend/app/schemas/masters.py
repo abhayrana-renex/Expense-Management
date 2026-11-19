@@ -77,7 +77,7 @@ class VendorIn(_Trim):
     description: str | None = Field(None, max_length=1000)
     gstin: str | None = Field(None, pattern=GSTIN_RE)
     pan: str | None = Field(None, pattern=PAN_RE)
-    is_msme: bool = False
+    is_msme: bool = Field(True, description="MSME (Udyam registered); Yes unless set to No")
     udyam_number: str | None = Field(None, max_length=30)
 
     @field_validator("gstin", "pan", mode="before")

@@ -11,6 +11,7 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from app.services.bills import extras
 from app.services.bills import gstin as g
 from app.services.bills.words import words_to_amount
 
@@ -58,6 +59,9 @@ class F:
 class Parsed:
     fields: dict[str, F] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    # The 2-3 names in the bill header that could be the seller, best first; each is
+    # checked against the vendor list (service.match_vendor).
+    vendor_candidates: list[str] = field(default_factory=list)
 
     def set(self, name: str, value: Any, conf: float, source: str) -> None:
         if value is None or value == "":
@@ -132,6 +136,9 @@ _OCR_DIGITS = str.maketrans({"O": "0", "o": "0", "I": "1", "l": "1", "|": "1"})
 def normalize_text(text: str) -> str:
     """Fix common print/OCR artefacts before parsing (only inside numbers, never in words)."""
     t = text.replace("\u20a8", "₹").replace("\u00a0", " ").replace("：", ":")
+    # Glyphs a PDF has no text for come out as "(cid:299)" (often the ₹ sign): drop them, or
+    # their digits read as amounts.
+    t = re.sub(r"\(cid:\d+\)", " ", t)
     t = re.sub(r"(?<=\d)\s*/-", "", t)  # 5,487/-  -> 5,487
     # OCR letter/digit mix-ups, only inside tokens that are otherwise numbers:
     # "2,5OO.OO" -> "2,500.00", "O9/11/2026" -> "09/11/2026", "1,l00" -> "1,100".
@@ -258,6 +265,15 @@ FIELD_LINE = re.compile(
     r"billing|shipping|sl\.?\s*no|sr\.?\s*no)\b\s*[:#.\-]?",
     re.I,
 )
+LEGAL_SUFFIX = re.compile(r"\b(pvt\.?|private|ltd\.?|limited|llp)\b", re.I)
+SIGNATURE_FOR = re.compile(r"^\s*(?:declaration\s+)?for\s+(.{3,80}?)\s*:?\s*$", re.I)
+MAIL_HEADER = re.compile(r"^\s*(from|to|cc|bcc|subject|sent|date|reply-to)\s*:", re.I)
+MAIL_SIGNOFF = re.compile(
+    r"^(best|kind|warm|with)?\s*(regards|thanks|thank\s*you|sincerely|cheers)\b|"
+    r"^(dear|hi|hello|greetings)\b",
+    re.I,
+)
+EMAIL_ADDR = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 LABEL_PREFIX = re.compile(
     r"^(sold\s*by|seller|supplier|from|billed\s*by|vendor(\s*name)?|"
     r"issued\s*by|service\s*provider|company)\s*[:\-]\s*",
@@ -548,6 +564,13 @@ def _table_header_values(lines: list[str]) -> dict[str, Decimal]:
     return {}
 
 
+TALLY_VALUE = re.compile(
+    r"([A-Z0-9][A-Z0-9/\-_.]*\d[A-Z0-9/\-_.]*)\s+"
+    r"(?:\d{1,2}[-/ .][A-Za-z]{3}[-/ .]\d{2,4}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\s*$",
+    re.I,
+)
+
+
 def _invoice_number(lines: list[str], gstins: set[str]) -> tuple[str | None, int]:
     best: tuple[int, str] | None = None
     token = re.compile(r"[A-Z0-9][A-Z0-9/\-_.]{1,39}", re.I)
@@ -558,9 +581,14 @@ def _invoice_number(lines: list[str], gstins: set[str]) -> tuple[str | None, int
             if not m:
                 continue
             rest = re.sub(r"^[\s:#.\-]+", "", line[m.end() :])
-            cands = token.findall(rest) or (
-                token.findall(lines[i + 1]) if i + 1 < len(lines) else []
-            )
+            # Column headings with the values on the next line (Tally: "Invoice No.  Dated"
+            # over "... AD/26-27/5269  14-Nov-26"): the number is the token before the date.
+            if not rest or re.fullmatch(r"(dated?|dt\.?)\b.*", rest, re.I):
+                nxt = lines[i + 1] if i + 1 < len(lines) else ""
+                tail = TALLY_VALUE.search(nxt)
+                cands = [tail.group(1)] if tail else token.findall(nxt)
+            else:
+                cands = token.findall(rest)
             for cand in cands[:3]:
                 cand = cand.strip(".-/")
                 if (
@@ -626,9 +654,34 @@ def _gstin_roles(lines: list[str], company_gstins: set[str]) -> tuple[str | None
     return seller, buyer, seller_idx
 
 
+def _key(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def _heading_boost(line: str, headings: list[dict]) -> float:
+    """Extra score for a name printed bigger / in colour / bold at the top of the bill: the
+    seller's name usually is, while the buyer's and other names are body-size text."""
+    k = _key(line)
+    best = 0.0
+    for rank, h in enumerate(headings):
+        hk = _key(h["text"])
+        if len(hk) < 4 or len(k) < 4 or not (hk in k or k in hk):
+            continue
+        boost = min(4.0, max(0.0, h["ratio"] - 1) * 5) + (1.0 if rank == 0 else 0)
+        boost += (1.5 if h["colored"] else 0) + (0.5 if h["bold"] else 0)
+        best = max(best, boost)
+    return best
+
+
 def _vendor_name(
-    lines: list[str], seller_idx: int, company_names: list[str]
-) -> tuple[str | None, float]:
+    lines: list[str],
+    seller_idx: int,
+    company_names: list[str],
+    headings: list[dict] | None = None,
+) -> tuple[str | None, float, list[str]]:
+    """(name, confidence, up to 3 candidate names best first). Every candidate is later
+    checked against the vendor list, since a bill header often carries 2-3 names."""
+    headings = headings or []
     scored: list[tuple[float, str]] = []
     n = len(lines)
     buyer_zone: set[int] = set()
@@ -639,21 +692,35 @@ def _vendor_name(
         m = SELLER_CTX.search(line)
         if m and len(LABEL_PREFIX.sub("", line).strip(" :-")) < 3:
             after_seller_label.update({i + 1, i + 2})
-    for i, raw in enumerate(lines[: max(12, n // 2)]):
+
+    def name_part(raw: str) -> str | None:
+        if MAIL_HEADER.match(raw) or EMAIL_ADDR.search(raw):
+            return None  # "From: Name <a@b.com>", "Subject: ..." of an e-mailed bill
         line = LABEL_PREFIX.sub("", raw.strip())
+        line = re.sub(r"^0\d\s+(?=[A-Za-z])", "", line)  # Tally's "01 Abhinav ..." prefix
         line = re.split(r"\s{3,}|\bgstin\b|\bgst\s*(no|registration)\b", line, flags=re.I)[0].strip(
             " :-|,"
         )
-        if len(line) < 3 or len(line) > 80 or i in buyer_zone:
-            continue
+        if len(line) < 3 or len(line) > 80:
+            return None
         letters = sum(ch.isalpha() for ch in line)
         if letters < 3 or letters / len(line) < 0.6 or HEADER_NOISE.match(line):
-            continue
+            return None
         if any(c and c.lower() in line.lower() for c in company_names):
-            continue
+            return None
+        if re.search(r"[a-z]{2}[.!?]$", line) and not NAME_SUFFIX.search(line):
+            return None  # a sentence ("Pls upload and confirm."), not a name
+        if MAIL_SIGNOFF.match(line):
+            return None
         if FIELD_LINE.search(line) and not SELLER_CTX.search(raw):
+            return None
+        return line
+
+    for i, raw in enumerate(lines[: max(12, n // 2)]):
+        line = None if i in buyer_zone else name_part(raw)
+        if line is None:
             continue
-        score = 0.0
+        score = _heading_boost(line, headings)
         if SELLER_CTX.search(raw) or i in after_seller_label:
             score += 5 if i != max(after_seller_label, default=-1) else 3
         if NAME_SUFFIX.search(line):
@@ -667,12 +734,44 @@ def _vendor_name(
         if line.isupper() and len(line) > 4:
             score += 0.5
         scored.append((score, line))
+    # The signature block ("For Bharti Airtel Limited", "Declaration for X Pvt. Ltd.") names
+    # the legal seller, often below a big product / service heading ("FIXEDLINE AND
+    # BROADBAND SERVICES"), so it outranks the header.
+    # A registered legal name (Limited / Pvt / LLP) there is the strongest evidence of all.
+    for raw in lines:
+        sig = SIGNATURE_FOR.match(raw)
+        line = name_part(sig.group(1)) if sig else None
+        if line and NAME_SUFFIX.search(line):
+            bonus = 11.0 if LEGAL_SUFFIX.search(line) else 6.0
+            k = _key(line)
+            scored = [s for s in scored if _key(s[1]) not in (k, "for" + k)]
+            scored.append((bonus + 2 + _heading_boost(line, headings), line))
+    # A prominent heading that isn't among the lines above (e.g. OCR put it on its own) is a
+    # candidate too - unless it is the buyer's name printed in the "Bill To" block.
+    seen = [_key(s[1]) for s in scored]
+    buyer_keys = [_key(lines[i]) for i in buyer_zone if i < n]
+    for h in headings:
+        line = name_part(h["text"])
+        k = _key(line or "")
+        if not line or len(k) < 4 or any(k in s or s in k for s in seen + buyer_keys):
+            continue
+        score = _heading_boost(line, headings) + (3 if NAME_SUFFIX.search(line) else 0)
+        score -= 3 if ADDRESS_HINT.search(line) else 0
+        scored.append((score, line))
+        seen.append(k)
     if not scored:
-        return None, 0.0
+        return None, 0.0, []
     scored.sort(key=lambda s: -s[0])
     score, name = scored[0]
     conf = 0.85 if score >= 5 else 0.7 if score >= 3 else 0.5 if score >= 1.5 else 0.3
-    return re.sub(r"\s+", " ", name), conf
+    candidates: list[str] = []
+    for s, cand in scored:
+        cand = re.sub(r"\s+", " ", cand)
+        if s > 0 and _key(cand) not in {_key(c) for c in candidates}:
+            candidates.append(cand)
+        if len(candidates) == 3:
+            break
+    return re.sub(r"\s+", " ", name), conf, candidates
 
 
 _NUMERIC_TOKEN = re.compile(r"^[(₹]?(rs\.?)?[\d.,/%()-]+$|^(nos?|pcs|qty|hsn|sac|x)$", re.I)
@@ -834,7 +933,9 @@ def parse(
     company_gstins: set[str] | None = None,
     company_names: list[str] | None = None,
     qr: dict[str, Any] | None = None,
+    headings: list[dict] | None = None,
 ) -> Parsed:
+    """`headings`: prominent text at the top of page 1 (reader.ReadResult.headings)."""
     text = normalize_text(text)
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     company_gstins = company_gstins or set()
@@ -858,7 +959,9 @@ def parse(
         p.set("period_start", start, base_conf * conf, f"bill period ({how})")
         p.set("period_end", end, base_conf * conf, f"bill period ({how})")
 
-    name, name_conf = _vendor_name(lines, seller_idx, company_names or [])
+    name, name_conf, p.vendor_candidates = _vendor_name(
+        lines, seller_idx, company_names or [], headings
+    )
     p.set("vendor_name", name, min(base_conf, name_conf), "text")
 
     # Amounts
@@ -921,16 +1024,25 @@ def parse(
     if qr:
         _apply_qr(p, qr)
 
-    _reconcile(p, base_conf, full)
+    words_total = words_to_amount(full)
+    alts = [t[2] for t in sorted(totals, key=lambda t: -t[0])] + (
+        [words_total] if words_total else []
+    )
+    _reconcile(p, base_conf, full, alts)
     _check_words(p, full)
-    hsn = re.search(r"\b(?:HSN|SAC)(?:\s*/\s*SAC)?(?:\s*code)?\s*[:\-]?\s*(\d{4,8})\b", full, re.I)
+    hsn = re.search(
+        r"\b(?:HSN|SAC)(?:\s*/\s*SAC)?(?:\s*(?:code|no\.?|number))?\s*[:\-]?\s*(\d{4,8})\b",
+        full,
+        re.I,
+    )
     if hsn:
         p.set("hsn_sac", hsn.group(1), base_conf * 0.9, "text")
     else:
         for i, line in enumerate(lines):
             if re.search(r"\b(hsn|sac)\b", line, re.I):
                 for nxt in lines[i + 1 : i + 4]:
-                    code = re.search(r"(?<![\d.,])(\d{4}|\d{6}|\d{8})(?![\d.,])", nxt)
+                    # A whole number, not digits inside a PAN / GSTIN ("AACCG3221E").
+                    code = re.search(r"(?<![\w.,])(\d{4}|\d{6}|\d{8})(?![\w.,])", nxt)
                     if code:
                         p.set("hsn_sac", code.group(1), base_conf * 0.75, "table")
                         break
@@ -955,6 +1067,7 @@ def parse(
     ):
         p.warnings.append("Amounts may not be in INR - check the currency")
 
+    extras.extract(p, lines, base_conf)
     vendor = p.get("vendor_name")
     cat, cat_conf = _category(full, vendor)
     if cat:
@@ -1032,9 +1145,10 @@ def _apply_qr(p: Parsed, qr: dict[str, Any]) -> None:
                 p.set(name, val, 0.9, src)
 
 
-def _reconcile(p: Parsed, base: float, text: str) -> None:
+def _reconcile(p: Parsed, base: float, text: str, alts: list[Decimal] | None = None) -> None:
     """Make the money fields consistent; derive what's missing; flag what doesn't add up."""
     get = p.get
+    alts = alts or []
     total, taxable = get("total_amount"), get("taxable_amount")
     cgst, sgst, igst = get("cgst_amount"), get("sgst_amount"), get("igst_amount")
     ro = get("round_off") or D0
@@ -1059,6 +1173,14 @@ def _reconcile(p: Parsed, base: float, text: str) -> None:
         p.set("cgst_amount", sgst, p.fields["sgst_amount"].confidence * 0.85, "computed")
         cgst = sgst
     tax = (cgst or D0) + (sgst or D0) + (igst or D0)
+
+    # The chosen total doesn't add up, but another total printed on the bill does (a GST
+    # summary table's "Total" column is often the tax total, e.g. 270 under a 1,770 bill).
+    if total is not None and taxable is not None and abs(taxable + tax + ro - total) > TOLERANCE:
+        fits = [a for a in alts if abs(taxable + tax + ro - a) <= TOLERANCE]
+        if fits:
+            total = fits[0]
+            p.fields["total_amount"] = F(total, min(0.95, base), "text (adds up)")
 
     if total is not None and taxable is not None:
         if abs(taxable + tax + ro - total) <= TOLERANCE:
@@ -1119,7 +1241,13 @@ def _reconcile(p: Parsed, base: float, text: str) -> None:
         )
     else:
         decimals = [to_money(m.group(1)) for m in _AMT.finditer(text) if "." in m.group(1)]
-        pool = [a for a in decimals if a is not None] or amounts(text)
+        # Only money-looking numbers (paise, or a ₹ / Rs / INR mark): a bare number may be
+        # a PIN code or phone number ("Gurugram, Haryana - 122015").
+        marked = [
+            to_money(m)
+            for m in re.findall(r"(?:₹|\brs\.?|\binr)\s*([\d,]+(?:\.\d{1,2})?)", text, re.I)
+        ]
+        pool = [a for a in decimals + marked if a is not None]
         biggest = max((a for a in pool if a < Decimal("10000000")), default=None)
         if biggest is not None:
             p.set("total_amount", biggest, 0.35, "largest amount")

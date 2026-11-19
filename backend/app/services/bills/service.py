@@ -6,10 +6,7 @@ bill_extractions so auditors can compare what was read with what was submitted.
 """
 
 import logging
-import re
 import time
-from difflib import SequenceMatcher
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,62 +14,13 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.deps import Principal
 from app.core.errors import AppError
-from app.models import BillExtraction, ExpenseDocument, ExpenseType, Partner, VendorProfile
+from app.models import BillExtraction, ExpenseDocument, ExpenseType
 from app.services import audit_service, document_service
 from app.services.bills import email_import, parser, qr, reader
+from app.services.bills.vendor_match import match_vendor
 
 log = logging.getLogger("app.bills")
 ENGINE = "qr+pdfplumber+rapidocr(PP-OCRv4)"
-_SUFFIXES = re.compile(r"\b(private|pvt|limited|ltd|llp|india|co|company|the|and|&)\b\.?", re.I)
-
-
-def _norm_name(name: str) -> str:
-    return re.sub(r"\s+", " ", _SUFFIXES.sub(" ", re.sub(r"[^\w\s&]", " ", name.lower()))).strip()
-
-
-def match_vendor(db: Session, name: str | None, gstin: str | None) -> dict[str, Any] | None:
-    """FAR vendor for this bill: exact GSTIN first, then a close (not merely similar) name."""
-    if gstin:
-        hit = (
-            db.execute(
-                select(Partner)
-                .join(VendorProfile, VendorProfile.partner_id == Partner.id)
-                .where(VendorProfile.gstin == gstin.upper(), Partner.status == "Active")
-            )
-            .unique()
-            .scalar_one_or_none()
-        )
-        if hit:
-            return {"id": hit.id, "name": hit.name, "match": "gstin", "confidence": 0.99}
-    if not name:
-        return None
-    target = _norm_name(name)
-    if len(target) < 3:
-        return None
-    best: tuple[float, Partner] | None = None
-    for partner in db.execute(select(Partner).where(Partner.status == "Active")).unique().scalars():
-        cand = _norm_name(partner.name)
-        if not cand:
-            continue
-        # OCR sometimes drops spaces ("HOTELPUSHKARPALACE"): compare with and without them.
-        ratio = (
-            1.0
-            if cand == target
-            else max(
-                SequenceMatcher(None, cand, target).ratio(),
-                SequenceMatcher(None, cand.replace(" ", ""), target.replace(" ", "")).ratio(),
-            )
-        )
-        if best is None or ratio > best[0]:
-            best = (ratio, partner)
-    if best and best[0] >= 0.86:
-        return {
-            "id": best[1].id,
-            "name": best[1].name,
-            "match": "name",
-            "confidence": round(min(0.95, best[0]), 2),
-        }
-    return None
 
 
 def _category_id(db: Session, code: str | None) -> int | None:
@@ -95,6 +43,7 @@ def _read_and_parse(data: bytes, content_type: str) -> tuple[reader.ReadResult, 
         company_gstins=settings.company_gstins,
         company_names=settings.company_names,
         qr=decoded,
+        headings=read.headings,
     )
     if "einvoice" in decoded:
         parsed.warnings.append(
@@ -127,8 +76,10 @@ def store_only(db: Session, principal: Principal, filename: str, data: bytes) ->
 
 
 def extract_new_bill(db: Session, principal: Principal, filename: str, data: bytes) -> dict:
+    # Reading switched off (FEATURE_BILL_READER=false): the bill is still stored and attached,
+    # just not read - `extraction` is null and the person types every field.
     if not settings.FEATURE_BILL_READER:
-        raise AppError(404, "NOT_FOUND", "The bill reader is switched off")
+        return store_only(db, principal, filename, data)
     doc = document_service.store_bill(db, principal, filename, data, None, None)
     started = time.monotonic()
     try:
@@ -138,13 +89,31 @@ def extract_new_bill(db: Session, principal: Principal, filename: str, data: byt
         read = reader.ReadResult(warnings=["Couldn't read this bill; fill it in by hand"])
         parsed = parser.Parsed()
     fields = {k: v.as_dict() for k, v in parsed.fields.items()}
-    vendor = match_vendor(db, parsed.get("vendor_name"), parsed.get("vendor_gstin"))
+    vendor = match_vendor(
+        db,
+        parsed.get("vendor_name"),
+        parsed.get("vendor_gstin"),
+        candidates=parsed.vendor_candidates,
+        text=read.text,
+        relationship_number=parsed.get("relationship_number"),
+    )
     if vendor:
         fields["vendor_id"] = {
             "value": vendor["id"],
             "confidence": vendor["confidence"],
             "source": f"vendor list ({vendor['match']})",
             "label": vendor["name"],
+        }
+        if vendor.get("same_name"):
+            parsed.warnings.append(
+                f"{len(vendor['same_name'])} vendors have this name and no relationship number "
+                f"on the bill matched one - pick the right vendor: {', '.join(vendor['same_name'])}"
+            )
+    if parsed.vendor_candidates:
+        fields["vendor_candidates"] = {
+            "value": parsed.vendor_candidates,
+            "confidence": fields.get("vendor_name", {}).get("confidence", 0.5),
+            "source": "bill header (largest / coloured text first)",
         }
     cat_id = _category_id(db, parsed.get("category_code"))
     if cat_id:
@@ -202,9 +171,8 @@ def rate_check(principal: Principal) -> None:
 def import_email(db: Session, principal: Principal, filename: str, data: bytes) -> dict:
     """An Outlook .msg / .eml: every PDF / JPG / PNG attachment is read as a bill; with none,
     the e-mail's own text is (receipts like cabs and food orders). The original e-mail is kept
-    as evidence and attached to the first bill line by the UI."""
-    if not settings.FEATURE_BILL_READER:
-        raise AppError(404, "NOT_FOUND", "The bill reader is switched off")
+    as evidence and attached to the first bill line by the UI. With reading switched off the
+    bills are attached unread (extract_new_bill)."""
     kind = email_import.validate(filename, data)
     parsed = email_import.parse(kind, data)
     original = document_service.store_email(db, principal, filename, data, kind)

@@ -39,6 +39,8 @@ os.environ["APP_ENV"] = "test"
 # Tests are written for the default routing; chain tests switch it on themselves. Never inherit
 # the live .env setting.
 os.environ["APPROVAL_ROUTING"] = "band"
+# Same for the bill reader: on in tests (test_bill_reader_off switches it off itself).
+os.environ["FEATURE_BILL_READER"] = "true"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

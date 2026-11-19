@@ -93,7 +93,8 @@ class Partner(FarMaster, Base):
 
     @property
     def is_msme(self) -> bool:
-        return bool(self.profile and self.profile.is_msme)
+        # MSME unless someone said No: a vendor with no portal profile counts as MSME.
+        return self.profile.is_msme if self.profile else True
 
     @property
     def udyam_number(self) -> str | None:

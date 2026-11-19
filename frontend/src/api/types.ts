@@ -287,7 +287,8 @@ export interface RoleInfo { id: number; code: string; name: string; description:
 
 // ---------- Bill reader ----------
 export interface ExtractedField {
-  value: string | number | null;
+  /** boolean: supplier_msme; list: vendor_candidates (header names, best first). */
+  value: string | number | boolean | string[] | null;
   /** 0..1: how sure the reader is. */
   confidence: number;
   /** e-invoice QR, UPI QR, text, table, computed, vendor list (...), keywords, inferred */

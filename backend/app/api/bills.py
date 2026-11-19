@@ -74,8 +74,13 @@ FIELD_DOC = (
     "vendor_state, vendor_id (FAR vendor match), buyer_gstin, invoice_number, invoice_date, "
     "taxable_amount, cgst_amount, sgst_amount, igst_amount, total_amount, cgst_rate, sgst_rate, "
     "igst_rate, round_off, hsn_sac, place_of_supply, irn, description, category_code, "
-    "expense_type_id. Sources: e-invoice QR, UPI QR, PDF text, OCR, table, computed. "
-    "Nothing is applied automatically: show every field for the person to confirm."
+    "expense_type_id, udyam_number, supplier_msme (true when the bill shows a Udyam / MSME "
+    "registration), relationship_number, po_number, due_date, vendor_candidates (list: the "
+    "2-3 header names that could be the seller, largest / coloured text first; each is "
+    "checked against the vendor list, and the relationship number in FAR vendor names "
+    "decides between vendors with the same name). Sources: e-invoice QR, UPI QR, PDF text, "
+    "OCR, table, computed. Nothing is applied automatically: show every field for the "
+    "person to confirm."
 )
 
 

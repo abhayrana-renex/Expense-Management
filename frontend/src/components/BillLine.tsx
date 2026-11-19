@@ -26,6 +26,9 @@ export interface Line {
   supplier_gstin: string;
   /** MSME supplier: "yes" / "no", or "" when not stated. */
   supplier_msme: "" | "yes" | "no";
+  /** supplier_msme is still the default (Yes): the matched vendor's MSME status replaces it
+   *  until the person picks Yes / No themselves. */
+  msmeDefault?: boolean;
   /** New bills to attach (uploaded via the bill reader). */
   document_ids: number[];
   docs: { id: number; name: string; content_type: string }[];
@@ -52,7 +55,7 @@ export const blankLine = (): Line => ({
   key: crypto.randomUUID(), expense_date: today(), description: "", vendor_id: "",
   bill_number: "", bill_date: "", taxable_amount: "", cgst_amount: "", sgst_amount: "",
   igst_amount: "", cgst_rate: "", sgst_rate: "", igst_rate: "", supplier_name: "",
-  supplier_gstin: "", supplier_msme: "", document_ids: [], docs: [],
+  supplier_gstin: "", supplier_msme: "yes", msmeDefault: true, document_ids: [], docs: [],
   confirmed: true,
 });
 
@@ -80,12 +83,15 @@ export function lineFromBill(read: BillRead): Line {
     igst_rate: rateStr(f.igst_rate),
     supplier_name: str(f.vendor_name),
     supplier_gstin: str(f.vendor_gstin),
-    supplier_msme: "",
+    // MSME by default; a Udyam number / MSME registration on the bill makes it definite.
+    supplier_msme: "yes",
+    msmeDefault: f.supplier_msme?.value !== true,
     document_ids: [doc.id],
     docs: [{ id: doc.id, name: doc.original_filename, content_type: doc.content_type }],
     reading: read.extraction ? "done" : "failed",
-    fields: f,
-    warnings: read.extraction?.warnings ?? ["Couldn't read this bill; fill it in by hand"],
+    // No extraction = the bill was attached but not read (bill reading switched off).
+    fields: read.extraction ? f : undefined,
+    warnings: read.extraction?.warnings ?? ["Bill attached - type in the details from the bill"],
     methods: read.extraction?.methods ?? [],
     confirmed: false,
   };
@@ -280,12 +286,12 @@ export function BillLine({ line, index, vendors, rates, canRemove, onChange, onR
   const otherCompanies = useInvoiceCheck(line, expenseId, onChange);
   const vendorRow = vendors.find((v) => String(v.id) === line.vendor_id);
   // A vendor matched by the bill reader (or already on the line) brings its MSME status from
-  // the vendor list, unless someone has already said Yes / No.
+  // the vendor list, unless someone has already said Yes / No (the default Yes gives way).
   const vendorMsme = vendorRow ? !!vendorRow.is_msme : undefined;
-  const latest = useRef({ onChange, msme: line.supplier_msme });
-  latest.current = { onChange, msme: line.supplier_msme };
+  const latest = useRef({ onChange, msme: line.supplier_msme, byDefault: !!line.msmeDefault });
+  latest.current = { onChange, msme: line.supplier_msme, byDefault: !!line.msmeDefault };
   useEffect(() => {
-    if (vendorMsme !== undefined && latest.current.msme === "") {
+    if (vendorMsme !== undefined && (latest.current.msme === "" || latest.current.byDefault)) {
       latest.current.onChange({ supplier_msme: vendorMsme ? "yes" : "no" });
     }
   }, [vendorMsme, line.vendor_id]);
@@ -341,7 +347,8 @@ export function BillLine({ line, index, vendors, rates, canRemove, onChange, onR
         </LField>
         <LField line={line} name="supplier_msme" label="MSME vendor">
           <select className="select" value={line.supplier_msme} aria-label="MSME vendor"
-            onChange={(e) => onChange({ supplier_msme: e.target.value as Line["supplier_msme"] })}>
+            onChange={(e) => onChange({ supplier_msme: e.target.value as Line["supplier_msme"],
+              msmeDefault: false })}>
             <option value="">Select</option>
             <option value="yes">Yes - MSME</option>
             <option value="no">No</option>
