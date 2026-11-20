@@ -127,7 +127,7 @@ function Hint({ f, edited }: { f?: ExtractedField; edited: boolean }) {
   return (
     <span className={`conf conf-${l}`}
       title={`${Math.round(f.confidence * 100)}% sure · ${sourceLabel(f.source)}`}>
-      {text} · {sourceLabel(f.source)}
+      {text}<span className="conf-src"> · {sourceLabel(f.source)}</span>
     </span>
   );
 }

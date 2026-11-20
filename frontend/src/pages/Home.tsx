@@ -22,6 +22,33 @@ function Kpi({ label, value, foot, icon, tone }: {
   );
 }
 
+/** Key for the spend charts. Submitted = everything claimed (sent for approval, not cancelled):
+ *  the full bar. Approved = the part of it that has passed every approval level: the dark
+ *  part. The light rest is not yet approved. */
+function SpendLegend() {
+  return (
+    <span className="row small muted" title="Full bar = Submitted (everything claimed). Dark part = Approved.">
+      <span className="tag" style={{ background: "var(--brand-600)", color: "#fff" }}>Approved</span>
+      <span className="tag" style={{ background: "var(--brand-100)", color: "var(--brand-700)" }}>
+        Submitted</span>
+    </span>
+  );
+}
+
+function SpendNote() {
+  return (
+    <p className="small muted" style={{ margin: "0 0 10px" }}>
+      <strong>Submitted</strong> (full bar): everything claimed and sent for approval.{" "}
+      <strong>Approved</strong> (dark part): how much of that is fully approved. The light part is
+      not yet approved. Hover a bar for the amounts.
+    </p>
+  );
+}
+
+const spendTip = (label: string, amount: string, approved: string) =>
+  `${label}: ${inr(amount)} submitted · ${inr(approved)} approved · `
+  + `${inr(String(Math.max(0, Number(amount) - Number(approved)).toFixed(2)))} not yet approved`;
+
 function MonthBars({ data }: { data: Dashboard["series"]["by_month"] }) {
   if (!data.length) return <Empty title="No spend yet" text="Submitted expenses appear here." />;
   const max = Math.max(...data.map((d) => Number(d.amount)), 1);
@@ -33,7 +60,7 @@ function MonthBars({ data }: { data: Dashboard["series"]["by_month"] }) {
         const label = new Date(`${d.month}T00:00:00`).toLocaleDateString("en-IN",
           { month: "short" });
         return (
-          <div key={d.month} className="bar-col" title={`${label}: ${inr(d.amount)}`}>
+          <div key={d.month} className="bar-col" title={spendTip(label, d.amount, d.approved_amount)}>
             <span className="small amount">{inr(d.amount, { compact: true })}</span>
             <div className="bar" style={{ height: `${(total / max) * 100}%` }}>
               <span style={{ height: `${total ? (approved / total) * 100 : 0}%` }} />
@@ -57,7 +84,7 @@ function DepartmentBars({ data }: { data: NonNullable<Dashboard["series"]["by_de
         const approved = Number(d.approved_amount);
         return (
           <div key={d.label} className="dept-row" role="listitem"
-            title={`${d.label}: ${inr(d.amount)} submitted, ${inr(d.approved_amount)} approved, ${d.count} claim(s)`}>
+            title={`${spendTip(d.label, d.amount, d.approved_amount)} · ${d.count} claim(s)`}>
             <span className="dept-name">{d.label}</span>
             <div className="dept-track">
               <div className="dept-bar" style={{ width: `${(total / max) * 100}%` }}>
@@ -122,11 +149,8 @@ export function Home() {
             <span className="sub">Last 6 months · {dash.data?.scope === "ALL" ? "Company"
               : dash.data?.scope === "OWN" ? "Your expenses" : "Your scope"}</span>
             <span className="spacer" />
-            <span className="row small muted"><span className="tag" style={{ background:
-              "var(--brand-600)", color: "#fff" }}>Approved</span><span className="tag"
-              style={{ background: "var(--brand-100)", color: "var(--brand-700)" }}>
-              Submitted</span></span></div>
-          <div className="card-body">{dash.isLoading ? <Skeleton rows={4} />
+            <SpendLegend /></div>
+          <div className="card-body"><SpendNote />{dash.isLoading ? <Skeleton rows={4} />
             : <MonthBars data={dash.data?.series.by_month ?? []} />}</div>
         </div>
         <div className="card">
@@ -151,11 +175,8 @@ export function Home() {
           <span className="sub">{dash.data?.scope === "ALL" ? "Company" : dash.data?.scope === "OWN"
             ? "Your expenses" : "Your scope"} · submitted, not cancelled</span>
           <span className="spacer" />
-          <span className="row small muted"><span className="tag" style={{ background:
-            "var(--brand-600)", color: "#fff" }}>Approved</span><span className="tag"
-            style={{ background: "var(--brand-100)", color: "var(--brand-700)" }}>
-            Submitted</span></span></div>
-        <div className="card-body">{dash.isLoading ? <Skeleton rows={4} />
+          <SpendLegend /></div>
+        <div className="card-body"><SpendNote />{dash.isLoading ? <Skeleton rows={4} />
           : <DepartmentBars data={dash.data?.series.by_department ?? []} />}</div>
       </div>
 

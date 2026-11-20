@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Banknote, BarChart3, CheckSquare, ChevronDown, Database, FileText, Home, KeyRound, KeySquare,
-  LogOut, Plus,
-  Receipt, Search, ShieldCheck, SlidersHorizontal, Users,
+  LogOut, Menu, Plus,
+  Receipt, Search, ShieldCheck, SlidersHorizontal, Users, X,
 } from "lucide-react";
 import { api } from "../api/client";
 import type { ExpenseSummary } from "../api/types";
@@ -17,6 +17,10 @@ export function Layout() {
   const { me, can, logout } = useAuth();
   const navigate = useNavigate();
   const [menu, setMenu] = useState(false);
+  // Phones / narrow windows: the side menu is a panel opened from the top bar.
+  const [nav, setNav] = useState(false);
+  const location = useLocation();
+  useEffect(() => { setNav(false); }, [location.pathname]);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const queue = useQuery({
@@ -38,8 +42,11 @@ export function Layout() {
   const isAdmin = can("user.manage") || can("master.manage") || can("audit.read");
 
   return (
-    <div className="shell">
-      <aside className="sidebar">
+    <div className={`shell ${nav ? "nav-open" : ""}`}>
+      <div className="nav-scrim" onClick={() => setNav(false)} aria-hidden />
+      <aside className="sidebar" aria-label="Main menu">
+        <button type="button" className="btn btn-ghost btn-sm nav-close" aria-label="Close menu"
+          onClick={() => setNav(false)}><X size={16} /></button>
         <div className="brand">
           <div className="brand-mark">E</div>
           <div>
@@ -88,6 +95,8 @@ export function Layout() {
 
       <div className="main">
         <header className="topbar">
+          <button type="button" className="btn btn-ghost nav-toggle" aria-label="Open menu"
+            aria-expanded={nav} onClick={() => setNav(true)}><Menu size={18} /></button>
           <button type="button" className="search search-trigger"
             onClick={() => window.dispatchEvent(new Event("open-palette"))}>
             <Search size={15} />
@@ -97,15 +106,16 @@ export function Layout() {
           <div className="topbar-right">
             <NotificationBell />
             {can("expense.create") && (
-              <button className="btn btn-primary" onClick={() => navigate("/expenses/new")}>
-                <Plus size={16} />New expense
+              <button className="btn btn-primary new-expense-btn" aria-label="New expense"
+                onClick={() => navigate("/expenses/new")}>
+                <Plus size={16} /><span>New expense</span>
               </button>
             )}
             <div style={{ position: "relative" }} ref={menuRef}>
               <button className="btn btn-ghost" onClick={() => setMenu((m) => !m)}
                 style={{ height: 40, gap: 8 }}>
                 <Avatar name={me.user.full_name} />
-                <span style={{ textAlign: "left", lineHeight: 1.2 }}>
+                <span className="user-meta" style={{ textAlign: "left", lineHeight: 1.2 }}>
                   <span style={{ display: "block", fontWeight: 600 }}>{me.user.full_name}</span>
                   <span className="cell-sub">{me.user.role.name}</span>
                 </span>
