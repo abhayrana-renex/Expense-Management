@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     COMPANY_GSTINS: str = ""
     # Our company name(s) (comma-separated) so they are never mistaken for the vendor.
     COMPANY_NAMES: str = ""
+    # Our PAN(s): every GSTIN carrying it (any state) is ours, i.e. the buyer on a bill.
+    COMPANY_PANS: str = ""
     BILL_READER_MAX_PAGES: int = 4
 
     # ---------- Seed ----------
@@ -106,6 +108,10 @@ class Settings(BaseSettings):
     @property
     def company_gstins(self) -> set[str]:
         return {g.strip().upper() for g in self.COMPANY_GSTINS.split(",") if g.strip()}
+
+    @property
+    def company_pans(self) -> set[str]:
+        return {p.strip().upper() for p in self.COMPANY_PANS.split(",") if p.strip()}
 
     @property
     def company_names(self) -> list[str]:

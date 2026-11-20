@@ -2,7 +2,7 @@ import { Select } from "../components/Select";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ChevronRight, Plus, Send } from "lucide-react";
+import { ChevronRight, History, Plus, Send } from "lucide-react";
 import { api, ApiError } from "../api/client";
 import type {
   BillRead, BillType, EmailRead, Expense, GstRate, RouteStepPreview, ValidationIssue,
@@ -18,6 +18,10 @@ import type { StagedFile } from "../components/BillType";
 import { ErrorAlert, Field, Modal, PageHead, Skeleton, useToast } from "../components/ui";
 import { inr, periodLength, sumMoney, today as todayIso } from "../lib/format";
 import { useMaster } from "../lib/masters";
+import {
+  applyLines, attachLines, clearDraft, isReading, loadDraft, readingFinished, readingStarted,
+  saveDraft,
+} from "../lib/expenseDraft";
 
 const PARALLEL_READS = 3;
 
@@ -56,6 +60,7 @@ export function ExpenseForm() {
   const { id } = useParams();
   const editing = Boolean(id);
   const { me } = useAuth();
+  const uid = me?.user.id;
   const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();
@@ -158,6 +163,71 @@ export function ExpenseForm() {
     setCentreId(linked ? String(linked.id) : "");
   }, [editing, deptId, centres.data]);
 
+  // ---- New expense kept while the person is on other pages (lib/expenseDraft.ts) ----
+  const [restoredAt, setRestoredAt] = useState<number | null>(null);
+  const restoreChecked = useRef(false);
+  useEffect(() => {
+    if (editing || !uid || restoreChecked.current) return;
+    restoreChecked.current = true;
+    if ((location.state as { copyFrom?: Expense } | null)?.copyFrom) return; // a copy starts fresh
+    const draft = loadDraft(uid);
+    if (!draft) return;
+    const d = draft.data;
+    // A bill that was being read when the page was closed (not just left) can't finish.
+    const lost = d.lines.filter((l) => l.reading === "pending" && !isReading(l.key));
+    const kept = d.lines.filter((l) => !lost.includes(l));
+    loaded.current = true;
+    titleTouched.current = d.touched.title;
+    purposeTouched.current = d.touched.purpose;
+    periodTouched.current = d.touched.period;
+    centreTouched.current = true;
+    setBillType(d.billType as BillType); setDetails({ ...NO_DETAILS, ...d.details });
+    setBaseDocs(d.baseDocs); setTitle(d.title); setPurpose(d.purpose); setTypeId(d.typeId);
+    setBranchId(d.branchId); setCentreId(d.centreId); setDeptId(d.deptId);
+    setPeriodFrom(d.periodFrom); setPeriodTo(d.periodTo); setPeriodSource(d.periodSource);
+    setManual(d.manual);
+    setLines(kept.length ? kept : [blankLine()]);
+    setRestoredAt(draft.savedAt);
+    if (lost.length) {
+      toast(`${lost.length} bill(s) were still being read when the page closed - upload `
+        + "them again", "error");
+    }
+  }, [editing, uid, location.state]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Bills read while the form is open land here; while it is closed, in the kept copy.
+  useEffect(() => (editing || !uid ? undefined : attachLines(uid, setLines)), [editing, uid]);
+
+  // Keep the form as it is typed (debounced). An empty form keeps nothing.
+  useEffect(() => {
+    if (editing || !uid || !restoreChecked.current) return;
+    const t = setTimeout(() => {
+      const hasContent = Boolean(title.trim() || purpose.trim() || baseDocs.length
+        || Object.values(details).some(Boolean)
+        || lines.some((l) => l.docs.length || l.reading || l.taxable_amount || l.description
+          || l.bill_number || l.supplier_name));
+      if (!hasContent) { clearDraft(uid); return; }
+      saveDraft(uid, {
+        billType, details: { ...details }, baseDocs, title, purpose, typeId, branchId, centreId,
+        deptId, periodFrom, periodTo, periodSource, manual, lines,
+        touched: { title: titleTouched.current, purpose: purposeTouched.current,
+          period: periodTouched.current, centre: centreTouched.current },
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [editing, uid, billType, details, baseDocs, title, purpose, typeId, branchId, centreId,
+    deptId, periodFrom, periodTo, periodSource, manual, lines]);
+
+  /** Throw away the kept form and start a blank one (defaults apply again). */
+  function startOver() {
+    if (uid) clearDraft(uid);
+    titleTouched.current = false; purposeTouched.current = false;
+    periodTouched.current = false; centreTouched.current = false;
+    setBillType("PO"); setDetails(NO_DETAILS); setBaseDocs([]); setTitle(""); setPurpose("");
+    setTypeId(""); setBranchId(""); setCentreId(""); setDeptId(""); setPeriodFrom("");
+    setPeriodTo(""); setPeriodSource(""); setManual(false); setLines([blankLine()]);
+    setIssues([]); setError(null); setRestoredAt(null);
+  }
+
   // Bill period read from the bill (billing / service period, "for the month of ...").
   useEffect(() => {
     const read = lines.filter((l) => l.reading === "done");
@@ -200,6 +270,10 @@ export function ExpenseForm() {
     setLines((ls) => [...ls.filter((l) => l.id || l.reading || l.docs.length || l.taxable_amount
       || l.description || l.bill_number), ...placeholders]);
     const queue = files.map((f, i) => ({ file: f, key: placeholders[i]!.key }));
+    queue.forEach((j) => readingStarted(j.key));
+    // Results reach the form even if the person went to another page meanwhile.
+    const put = (change: (ls: Line[]) => Line[]) =>
+      (uid && !editing ? applyLines(uid, change) : setLines(change));
     const worker = async () => {
       for (let job = queue.shift(); job; job = queue.shift()) {
         const current = job;
@@ -207,7 +281,7 @@ export function ExpenseForm() {
           if (EMAIL_FILE_RE.test(current.file.name)) {
             const res = await api.upload<EmailRead>("/bills/read-email", current.file);
             const filled = linesFromEmail(res);
-            setLines((ls) => ls.flatMap((l) => (l.key === current.key ? filled : [l])));
+            put((ls) => ls.flatMap((l) => (l.key === current.key ? filled : [l])));
             const loud = res.skipped.filter((s) => !s.quiet);
             if (!filled.length) {
               toast(`${current.file.name}: no bill found in this e-mail${loud.length
@@ -219,10 +293,12 @@ export function ExpenseForm() {
           }
           const res = await api.upload<BillRead>("/bills/read", current.file);
           const filled = lineFromBill(res);
-          setLines((ls) => ls.map((l) => (l.key === current.key ? { ...filled, key: l.key } : l)));
+          put((ls) => ls.map((l) => (l.key === current.key ? { ...filled, key: l.key } : l)));
         } catch (e) {
           toast(`${current.file.name}: ${e instanceof ApiError ? e.message : "upload failed"}`, "error");
-          setLines((ls) => ls.filter((l) => l.key !== current.key));
+          put((ls) => ls.filter((l) => l.key !== current.key));
+        } finally {
+          readingFinished(current.key);
         }
       }
     };
@@ -385,6 +461,7 @@ export function ExpenseForm() {
       const saved = editing
         ? await api.put<Expense>(`/expenses/${id}`, { ...payload(), version: existing.data!.version })
         : await api.post<Expense>("/expenses", payload(), { "Idempotency-Key": api.newIdempotencyKey() });
+      if (!editing && uid) clearDraft(uid); // it is a saved draft on the server now
       qc.invalidateQueries({ queryKey: ["expenses"] });
       loaded.current = false;
       qc.setQueryData(["expense", String(saved.id)], saved);
@@ -495,6 +572,18 @@ export function ExpenseForm() {
           {editing ? existing.data?.expense_no : "New"}</>}
         subtitle={editing && existing.data?.status === "RETURNED"
           ? "Returned to you - make the requested changes and resubmit." : undefined} />
+
+      {restoredAt && !editing && (
+        <div className="alert alert-info" role="status" style={{ alignItems: "center" }}>
+          <History size={16} style={{ flex: "none" }} />
+          <div style={{ flex: 1 }}>
+            <strong>Picked up where you left off.</strong> Your bills and details from{" "}
+            {new Date(restoredAt).toLocaleString("en-IN", { day: "numeric", month: "short",
+              hour: "2-digit", minute: "2-digit" })} are back.
+          </div>
+          <button className="btn btn-sm" onClick={startOver}>Start over</button>
+        </div>
+      )}
 
       <div style={{ display: "grid", gap: 10 }}>
         <ErrorAlert error={error} />
@@ -638,7 +727,10 @@ export function ExpenseForm() {
       </div>
 
       <div className="sticky-bar">
-        <button className="btn" onClick={() => navigate(-1)}>Cancel</button>
+        <button className="btn" onClick={() => {
+          if (!editing && uid) clearDraft(uid); // Cancel = throw this new expense away
+          navigate(-1);
+        }}>Cancel</button>
         <span className="spacer" />
         {dupLines > 0 && <span className="small" style={{ color: "var(--red-600)" }}>
           {dupLines} duplicate invoice{dupLines === 1 ? "" : "s"}</span>}

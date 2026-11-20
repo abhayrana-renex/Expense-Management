@@ -300,3 +300,53 @@ def test_every_match_lists_suggestions(db):
         "Ramesh Kumar Yadav-1801-E",
         "Ramesh Kumar Yadav-1802-E",
     }
+
+
+def test_vendor_found_from_another_header_name(db):
+    """Biggest / coloured name first; when it isn't in the vendor list, the other header
+    names are checked too, and the most prominent one in the list wins."""
+    for name in ("Kalpana Traders Pvt Ltd", "Meera Stationers", "Zenith Office Supplies"):
+        db.add(Partner(type="Vendor", name=name, status="Active"))
+    db.flush()
+    header = ["SUNRISE MART", "Kalpana Traders Pvt Ltd", "Zenith Office Supplies"]
+    hit = match_vendor(db, header[0], None, candidates=header[1:])
+    # Both lower names are in the list: the more prominent of them (2nd) is chosen.
+    assert hit["name"] == "Kalpana Traders Pvt Ltd"
+    assert hit["via"] == "Kalpana Traders Pvt Ltd" and hit["via_rank"] == 1
+    # When the most prominent name is in the list, it wins over a closer lower one.
+    top = match_vendor(db, "Zenith Office Supplies", None, candidates=["Kalpana Traders Pvt Ltd"])
+    assert top["name"] == "Zenith Office Supplies" and top["via_rank"] == 0
+
+
+def test_up_to_six_header_names_are_checked():
+    lines = [
+        "SUNRISE MART",
+        "A unit of Kalpana Traders Pvt Ltd",
+        "Franchise of Zenith Office Supplies",
+        "Authorised distributor of Meera Stationers",
+        "Tax Invoice",
+    ]
+    heads = [{"text": "SUNRISE MART", "ratio": 2.0, "colored": True, "bold": True}]
+    p = parse("\n".join(lines) + "\nTotal 500.00", headings=heads)
+    assert p.vendor_candidates[0] == "SUNRISE MART"
+    # "A unit of" / "Franchise of" / "Authorised distributor of" is dropped: the name follows.
+    for name in ("Kalpana Traders Pvt Ltd", "Zenith Office Supplies", "Meera Stationers"):
+        assert name in p.vendor_candidates
+
+
+def test_our_company_by_pan_and_name_is_never_the_seller():
+    """Our GSTIN in any state is recognised by its PAN, and our name on the seller's line
+    (a common two-column layout) is cut off rather than read as part of the vendor name."""
+    bill = "\n".join(
+        [
+            "Quillon Technologies Private Limited NORTHWIND FINANCE (INDIA) LIMITED",
+            "GSTIN: 07AAACQ1234B1Z4",
+            "Bill To: NORTHWIND FINANCE (INDIA) LIMITED  GSTIN: 24AAGCN9876C1Z7",
+            "Invoice No: QT/88   Date: 05/11/2026",
+            "Taxable Value 1,000.00  IGST 180.00  Total 1,180.00",
+        ]
+    )
+    p = parse(bill, company_names=["Northwind Finance"], company_pans={"AAGCN9876C"})
+    assert p.get("vendor_name") == "Quillon Technologies Private Limited"
+    assert p.get("vendor_gstin") == "07AAACQ1234B1Z4"
+    assert p.get("buyer_gstin") == "24AAGCN9876C1Z7"

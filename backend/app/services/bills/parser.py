@@ -265,6 +265,22 @@ FIELD_LINE = re.compile(
     r"billing|shipping|sl\.?\s*no|sr\.?\s*no)\b\s*[:#.\-]?",
     re.I,
 )
+# The seller's bank details ("NEFT/RTGS Details- ICICI BANK"), never the seller's name.
+BANK_LINE = re.compile(
+    r"(neft|rtgs|ifsc|imps|upi\s*id|a/c\s*(no|number)|account\s*(no|number)|"
+    r"bank\s*(details|name|a/c|account)|branch\s*&?\s*ifs)",
+    re.I,
+)
+PIN_AT_END = re.compile(r"[\s,\-]\d{3}\s?\d{3}\s*\.?\s*$")
+RELATION_PREFIX = re.compile(
+    r"^(?:an?\s+)?(?:(?:unit|division|brand|franchisee?|subsidiary|member|partner|"
+    r"distributor|dealer|stockist|reseller|agent|group\s+company)\s+of|"
+    r"authori[sz]ed\s+(?:dealer|distributor|partner|reseller|agent|stockist|service\s+cent(?:re|er))"
+    r"(?:\s+(?:of|for))?|(?:managed|operated|owned|powered|marketed|run)\s+by)\s*[:\-]?\s*",
+    re.I,
+)
+# Names from the bill header checked against the vendor list, most prominent first.
+MAX_HEADER_NAMES = 6
 LEGAL_SUFFIX = re.compile(r"\b(pvt\.?|private|ltd\.?|limited|llp)\b", re.I)
 SIGNATURE_FOR = re.compile(r"^\s*(?:declaration\s+)?for\s+(.{3,80}?)\s*:?\s*$", re.I)
 MAIL_HEADER = re.compile(r"^\s*(from|to|cc|bcc|subject|sent|date|reply-to)\s*:", re.I)
@@ -679,8 +695,9 @@ def _vendor_name(
     company_names: list[str],
     headings: list[dict] | None = None,
 ) -> tuple[str | None, float, list[str]]:
-    """(name, confidence, up to 3 candidate names best first). Every candidate is later
-    checked against the vendor list, since a bill header often carries 2-3 names."""
+    """(name, confidence, up to MAX_HEADER_NAMES candidate names, most prominent first).
+    A header often carries 2-3 names (brand, legal name, group); every one is checked against
+    the vendor list, so a vendor is found even when the biggest name is not in it."""
     headings = headings or []
     scored: list[tuple[float, str]] = []
     n = len(lines)
@@ -694,10 +711,16 @@ def _vendor_name(
             after_seller_label.update({i + 1, i + 2})
 
     def name_part(raw: str) -> str | None:
-        if MAIL_HEADER.match(raw) or EMAIL_ADDR.search(raw):
-            return None  # "From: Name <a@b.com>", "Subject: ..." of an e-mailed bill
+        # E-mail headers ("From: Name <a@b.com>"), bank details and addresses ending in a
+        # PIN code ("Hazratganj, Lucknow-226001") are never the seller's name.
+        if MAIL_HEADER.match(raw) or EMAIL_ADDR.search(raw) or BANK_LINE.search(raw):
+            return None
+        if PIN_AT_END.search(raw):
+            return None
         line = LABEL_PREFIX.sub("", raw.strip())
         line = re.sub(r"^0\d\s+(?=[A-Za-z])", "", line)  # Tally's "01 Abhinav ..." prefix
+        # "(A unit of X)", "Authorised dealer of X", "Managed by X": the name is X.
+        line = RELATION_PREFIX.sub("", line.strip(" ()[]")).strip(" ()[]:-")
         line = re.split(r"\s{3,}|\bgstin\b|\bgst\s*(no|registration)\b", line, flags=re.I)[0].strip(
             " :-|,"
         )
@@ -706,8 +729,17 @@ def _vendor_name(
         letters = sum(ch.isalpha() for ch in line)
         if letters < 3 or letters / len(line) < 0.6 or HEADER_NOISE.match(line):
             return None
-        if any(c and c.lower() in line.lower() for c in company_names):
+        # Our own company is the buyer, never the seller. On a line that holds both
+        # ("Proyo Technologies Pvt Ltd  ART HOUSING FINANCE ..."), keep what comes first.
+        at = min(
+            (i for c in company_names if c and (i := line.lower().find(c.lower())) >= 0), default=-1
+        )
+        if at == 0:
             return None
+        if at > 0:
+            line = line[:at].strip(" ,:-|/")
+            if len(line) < 3:
+                return None
         if re.search(r"[a-z]{2}[.!?]$", line) and not NAME_SUFFIX.search(line):
             return None  # a sentence ("Pls upload and confirm."), not a name
         if MAIL_SIGNOFF.match(line):
@@ -769,7 +801,7 @@ def _vendor_name(
         cand = re.sub(r"\s+", " ", cand)
         if s > 0 and _key(cand) not in {_key(c) for c in candidates}:
             candidates.append(cand)
-        if len(candidates) == 3:
+        if len(candidates) == MAX_HEADER_NAMES:
             break
     return re.sub(r"\s+", " ", name), conf, candidates
 
@@ -932,16 +964,20 @@ def parse(
     base_conf: float = 0.9,
     company_gstins: set[str] | None = None,
     company_names: list[str] | None = None,
+    company_pans: set[str] | None = None,
     qr: dict[str, Any] | None = None,
     headings: list[dict] | None = None,
 ) -> Parsed:
     """`headings`: prominent text at the top of page 1 (reader.ReadResult.headings)."""
     text = normalize_text(text)
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    company_gstins = company_gstins or set()
+    company_gstins = set(company_gstins or set())
     p = Parsed()
     full = "\n".join(lines)
 
+    # Any GSTIN carrying our PAN (characters 3-12) is ours, whichever state it is from.
+    if company_pans:
+        company_gstins |= {x[0] for x in g.find_all(full) if x[0][2:12] in company_pans}
     seller, buyer, seller_idx = _gstin_roles(lines, company_gstins)
     all_gstins = {x[0] for x in g.find_all(full)}
     if seller:

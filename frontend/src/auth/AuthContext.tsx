@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from "react";
 import { api, setUnauthorizedHandler, tokens } from "../api/client";
 import type { Me, TokenResponse } from "../api/types";
+import { clearAllDrafts } from "../lib/expenseDraft";
 
 interface AuthState {
   me: Me | null;
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     try { await api.post("/auth/logout"); } catch { /* already gone */ }
     tokens.clear();
+    clearAllDrafts(); // shared office PCs: no half-filled expense stays behind
     setMe(null);
   }, []);
 

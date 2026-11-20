@@ -198,11 +198,15 @@ def match_vendor(
     if gstin and (hit := _by_pan(vendors, gstin)):
         # Same company, another state's registration (GSTIN characters 3-12 are the PAN).
         return {"id": hit.id, "name": hit.name, "match": "PAN in GSTIN", "confidence": 0.93}
-    targets = []
+    # Every name the header could hold, most prominent first (different size / colour /
+    # boldness, then the rest): the first one found in the vendor list decides.
+    targets: list[str] = []
+    original: dict[str, str] = {}
     for n in [name, *(candidates or [])]:
         t = norm_name(n or "")
         if len(t) >= 3 and t not in targets:
             targets.append(t)
+            original[t] = " ".join((n or "").split())
     if not targets:
         return None
     labelled = extras.digits(relationship_number or "")
@@ -213,7 +217,8 @@ def match_vendor(
     # a person's name, which would match any employee vendor with that first name.
     company_names = [norm_name(n) for n in [name, *(candidates or [])] if n and COMPANY.search(n)]
     header_words = {w for n in company_names for w in _words(n)}
-    rows: list[tuple[float, bool, Partner]] = []  # (name similarity, number on bill, vendor)
+    # (name similarity, number on bill, vendor, index of the header name it matched)
+    rows: list[tuple[float, bool, Partner, int]] = []
     brand: list[Partner] = []  # vendor's own name word is in the bill header
     # Vendor's whole name is how a company name on the bill starts ("Tata" -> "Tata Tele
     # Business Services Ltd"): FAR often keeps just the short name.
@@ -223,14 +228,17 @@ def match_vendor(
         cand = norm_name(base)
         if not cand:
             continue
-        ratio = max(_similarity(cand, t) for t in targets)
+        ratios = [_similarity(cand, t) if _same_start(cand, t) else 0.0 for t in targets]
+        ratio = max(ratios)
+        # The most prominent header name this vendor matches (not just the closest one).
+        via = next((i for i, r in enumerate(ratios) if r >= NAME_MATCH), ratios.index(ratio))
         number_hit = bool(number and number in on_bill)
         own = _words(base) - GENERIC
         # A long account number ("Airtel-Meerut-7034893686") on the bill decides by itself,
         # provided the vendor's own name word ("airtel") is on the bill too.
         long_number_hit = number_hit and len(number) >= LONG_NUMBER and bool(own & bill_words)
         if ratio >= NAME_MATCH or (number_hit and ratio >= NAME_WITH_NUMBER) or long_number_hit:
-            rows.append((ratio, number_hit, partner))
+            rows.append((ratio, number_hit, partner, via))
         elif (first := _first_word(base)) and first in header_words:
             brand.append(partner)
             if not number and any(n == cand or n.startswith(cand + " ") for n in company_names):
@@ -251,13 +259,25 @@ def match_vendor(
         ),
         key=lambda r: -r[0],
     )
-    rows.sort(key=lambda r: (r[1], r[0]), reverse=True)  # relationship number first
+    # Relationship number on the bill first, then the most prominent header name that is in
+    # the vendor list, then the closest name.
+    rows.sort(key=lambda r: (r[1], -r[3], r[0]), reverse=True)
     suggestions = _unique([r[2] for r in rows] + leading + brand + [p for _, p in first_hits])
 
-    def result(best: Partner, match: str, confidence: float, same: list[str] | None = None):
+    def result(
+        best: Partner,
+        match: str,
+        confidence: float,
+        same: list[str] | None = None,
+        via: int | None = None,
+    ):
         out = {"id": best.id, "name": best.name, "match": match, "confidence": confidence}
         if same and len(same) > 1:
             out["same_name"] = same[:MAX_SUGGESTIONS]
+        if via is not None:
+            # Which name on the bill was found in the vendor list (header no. via + 1).
+            out["via"] = original[targets[via]]
+            out["via_rank"] = via
         out["suggestions"] = [{"id": s.id, "name": s.name} for s in suggestions]
         return out
 
@@ -275,13 +295,25 @@ def match_vendor(
             match = "same first name (several vendors)" if many else "same first name"
             return result(first_hits[0][1], match, 0.4, [p.name for _, p in first_hits])
         return None
-    ratio, number_hit, best = rows[0]
+    ratio, number_hit, best, via = rows[0]
     if number_hit:
-        return result(best, "name + relationship no.", 0.97)
-    same = [r[2].name for r in rows if abs(r[0] - ratio) <= SAME_NAME]
+        return result(best, "name + relationship no.", 0.97, via=via)
+    same = [r[2].name for r in rows if r[3] == via and abs(r[0] - ratio) <= SAME_NAME]
     if len(same) > 1:
-        return result(best, "name (several vendors)", 0.5, same)
-    return result(best, "name", round(min(0.95, ratio), 2))
+        return result(best, "name (several vendors)", 0.5, same, via=via)
+    return result(best, "name", round(min(0.95, ratio), 2), via=via)
+
+
+def _same_start(a: str, b: str) -> bool:
+    """Both names begin with the same word (OCR may glue words: "abhinavdigital").
+    Stops a name that merely contains another ("lq global services" vs "global services")
+    from matching it."""
+    a, b = re.sub(r"^\d+\s*", "", a), re.sub(r"^\d+\s*", "", b)  # "01abhinav"
+    if not a or not b:
+        return False
+    x, y = a.split(" ", 1)[0], b.split(" ", 1)[0]
+    a0, b0 = a.replace(" ", ""), b.replace(" ", "")
+    return x.startswith(y) or y.startswith(x) or a0.startswith(y) or b0.startswith(x)
 
 
 def _unique(partners: list[Partner]) -> list[Partner]:

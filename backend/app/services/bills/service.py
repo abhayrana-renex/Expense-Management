@@ -20,6 +20,7 @@ from app.services.bills import email_import, parser, qr, reader
 from app.services.bills.vendor_match import match_vendor
 
 log = logging.getLogger("app.bills")
+SURE_VENDOR = 0.6  # below this a vendor is suggested, not filled in
 ENGINE = "qr+pdfplumber+rapidocr(PP-OCRv4)"
 
 
@@ -42,6 +43,7 @@ def _read_and_parse(data: bytes, content_type: str) -> tuple[reader.ReadResult, 
         base_conf=base,
         company_gstins=settings.company_gstins,
         company_names=settings.company_names,
+        company_pans=settings.company_pans,
         qr=decoded,
         headings=read.headings,
     )
@@ -97,13 +99,22 @@ def extract_new_bill(db: Session, principal: Principal, filename: str, data: byt
         text=read.text,
         relationship_number=parsed.get("relationship_number"),
     )
+    # Pre-fill the vendor only when the match is sure. First-name, brand and same-name
+    # matches are listed first in the vendor dropdown for the person to pick.
     if vendor:
-        fields["vendor_id"] = {
-            "value": vendor["id"],
-            "confidence": vendor["confidence"],
-            "source": f"vendor list ({vendor['match']})",
-            "label": vendor["name"],
-        }
+        sure = vendor["confidence"] >= SURE_VENDOR and not vendor.get("same_name")
+        if sure:
+            fields["vendor_id"] = {
+                "value": vendor["id"],
+                "confidence": vendor["confidence"],
+                "source": f"vendor list ({vendor['match']})",
+                "label": vendor["name"],
+            }
+        elif not vendor.get("same_name"):
+            parsed.warnings.append(
+                f"Possible vendor: {vendor['name']} ({vendor['match']}) - pick it from the top "
+                "of the vendor list if it is right"
+            )
         if vendor.get("same_name"):
             names = ", ".join(vendor["same_name"])
             if vendor["match"].startswith("same first name"):
@@ -116,6 +127,19 @@ def extract_new_bill(db: Session, principal: Principal, filename: str, data: byt
                     f"number on the bill matched one - pick the right vendor: {names}"
                 )
             parsed.warnings.append(note)
+        picked = fields.get("vendor_name", {}).get("value")
+        if sure and vendor.get("via_rank") and vendor.get("via") and vendor["via"] != picked:
+            # The most prominent header name isn't in the vendor list, but another name in the
+            # header is: show that one as the supplier, and say so.
+            fields["vendor_name"] = {
+                "value": vendor["via"],
+                "confidence": vendor["confidence"],
+                "source": "bill header (found in the vendor list)",
+            }
+            parsed.warnings.append(
+                f"Vendor found from another name in the bill header: “{vendor['via']}” "
+                f"(“{picked}” is not in the vendor list) - check it is the seller"
+            )
         if vendor.get("suggestions"):
             # Shown at the top of the vendor list on the bill line ("From the bill").
             fields["vendor_suggestions"] = {
@@ -141,7 +165,9 @@ def extract_new_bill(db: Session, principal: Principal, filename: str, data: byt
     if not fields.get("vendor_gstin") and "ocr" not in read.method and fields.get("total_amount"):
         warnings.append("No supplier GSTIN found - GST credit may not be claimable")
     buyer = parsed.get("buyer_gstin")
-    if settings.company_gstins and buyer and buyer not in settings.company_gstins:
+    ours = settings.company_gstins
+    pans = settings.company_pans
+    if (ours or pans) and buyer and buyer not in ours and buyer[2:12] not in pans:
         warnings.append(f"Bill is addressed to GSTIN {buyer}, which is not one of ours")
     extraction = BillExtraction(
         document_id=doc.id,
