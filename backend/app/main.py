@@ -5,7 +5,18 @@ import logging
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, bills, engagement, expenses, masters, reports, roles, system, users
+from app.api import (
+    auth,
+    bills,
+    contracts,
+    engagement,
+    expenses,
+    masters,
+    reports,
+    roles,
+    system,
+    users,
+)
 from app.core.config import settings
 from app.core.errors import register_error_handlers
 from app.core.middleware import install_middleware
@@ -44,7 +55,18 @@ def create_app() -> FastAPI:
         max_age=600,
     )
     api = APIRouter(prefix=settings.API_V1_PREFIX)
-    for module in (auth, users, roles, masters, bills, engagement, expenses, reports, system):
+    for module in (
+        auth,
+        users,
+        roles,
+        masters,
+        bills,
+        contracts,
+        engagement,
+        expenses,
+        reports,
+        system,
+    ):
         api.include_router(module.router)
     app.include_router(api)
     return app

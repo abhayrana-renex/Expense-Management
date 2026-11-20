@@ -15,7 +15,7 @@ export const BILL_TYPES: Record<BillType, { label: string; short: string; icon: 
   ADHOC: { label: "Ad-hoc (e-mail approval)", short: "Ad-hoc", icon: <MailCheck size={16} />,
     blurb: "No PO - approved over e-mail; attach that approval" },
   CONTRACT: { label: "Contract / MSA", short: "Contract", icon: <FileSignature size={16} />,
-    blurb: "Recurring bill under a contract or MSA; attach the contract" },
+    blurb: "Rent, AMC or service contract: pick the stored contract (upload it the first time)" },
 };
 
 /** Step 1 of a new expense: which type of bill is this? */

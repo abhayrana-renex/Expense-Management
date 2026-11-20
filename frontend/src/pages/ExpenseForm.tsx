@@ -5,7 +5,8 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronRight, History, Plus, Send } from "lucide-react";
 import { api, ApiError } from "../api/client";
 import type {
-  BillRead, BillType, EmailRead, Expense, GstRate, RouteStepPreview, ValidationIssue,
+  BillRead, BillType, Contract, ContractPeriod, EmailRead, Expense, GstRate, RouteStepPreview,
+  ValidationIssue,
 } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import {
@@ -15,6 +16,8 @@ import {
 import type { Line } from "../components/BillLine";
 import { AttachButton, BILL_TYPES, BillTypePicker, FileChip } from "../components/BillType";
 import type { StagedFile } from "../components/BillType";
+import { ContractPanel, NO_EXTRA } from "../components/ContractPanel";
+import type { ContractExtra } from "../components/ContractPanel";
 import { ErrorAlert, Field, Modal, PageHead, Skeleton, useToast } from "../components/ui";
 import { inr, periodLength, sumMoney, today as todayIso } from "../lib/format";
 import { useMaster } from "../lib/masters";
@@ -79,6 +82,9 @@ export function ExpenseForm() {
   const [billType, setBillType] = useState<BillType>("PO");
   const [details, setDetails] = useState<TypeDetails>(NO_DETAILS);
   const [baseDocs, setBaseDocs] = useState<StagedFile[]>([]);
+  /** CONTRACT: the stored contract this claim pays a period of (null = a new one). */
+  const [contract, setContract] = useState<Contract | null>(null);
+  const [contractExtra, setContractExtra] = useState<ContractExtra>(NO_EXTRA);
   const [title, setTitle] = useState("");
   const titleTouched = useRef(false);
   const purposeTouched = useRef(false);
@@ -118,6 +124,9 @@ export function ExpenseForm() {
     setPeriodFrom(e.bill_period_start ?? ""); setPeriodTo(e.bill_period_end ?? "");
     periodTouched.current = true;
     setLines(e.items.map(lineFromItem));
+    if (e.contract_id) {
+      api.get<Contract>(`/contracts/${e.contract_id}`).then(setContract).catch(() => setContract(null));
+    }
   }, [existing.data]);
 
   // "Duplicate": start a new draft from an earlier expense (no files, no ids, today's dates).
@@ -186,6 +195,10 @@ export function ExpenseForm() {
     setBranchId(d.branchId); setCentreId(d.centreId); setDeptId(d.deptId);
     setPeriodFrom(d.periodFrom); setPeriodTo(d.periodTo); setPeriodSource(d.periodSource);
     setManual(d.manual);
+    setContractExtra({ ...NO_EXTRA, ...(d.contractExtra ?? {}) });
+    if (d.contractId) {
+      api.get<Contract>(`/contracts/${d.contractId}`).then(setContract).catch(() => setContract(null));
+    }
     setLines(kept.length ? kept : [blankLine()]);
     setRestoredAt(draft.savedAt);
     if (lost.length) {
@@ -209,13 +222,47 @@ export function ExpenseForm() {
       saveDraft(uid, {
         billType, details: { ...details }, baseDocs, title, purpose, typeId, branchId, centreId,
         deptId, periodFrom, periodTo, periodSource, manual, lines,
+        contractId: contract?.id ?? null, contractExtra,
         touched: { title: titleTouched.current, purpose: purposeTouched.current,
           period: periodTouched.current, centre: centreTouched.current },
       });
     }, 400);
     return () => clearTimeout(t);
   }, [editing, uid, billType, details, baseDocs, title, purpose, typeId, branchId, centreId,
-    deptId, periodFrom, periodTo, periodSource, manual, lines]);
+    deptId, periodFrom, periodTo, periodSource, manual, lines, contract, contractExtra]);
+
+  /** Contract: claim one period of the stored contract (bill optional). */
+  function claimPeriod(c: Contract, p: ContractPeriod) {
+    periodTouched.current = true;
+    setPeriodFrom(p.start); setPeriodTo(p.end); setPeriodSource(`contract ${c.contract_no}`);
+    if (!titleTouched.current) setTitle(`${c.title || c.party_name} - ${p.label}`.slice(0, 200));
+    if (!typeId && c.expense_type_id) setTypeId(String(c.expense_type_id));
+    const amount = c.period_amount ?? "";
+    const rate = Number(c.gst_rate ?? 0);
+    const half = amount && rate ? (Number(amount) * rate / 200).toFixed(2) : "";
+    const day = p.start < todayIso() ? p.start : todayIso();
+    const fill: Partial<Line> = {
+      supplier_name: c.party_name, vendor_id: c.vendor ? String(c.vendor.id) : "",
+      description: `${p.label} - ${c.contract_no}`, expense_date: day,
+      ...(amount ? { taxable_amount: amount, cgst_amount: half, sgst_amount: half,
+        igst_amount: "" } : {}),
+    };
+    setLines((ls) => {
+      // Fill the bill line if there is one (keeping what was read from it), else add one.
+      const target = ls.find((l) => l.docs.length || l.taxable_amount) ?? ls[0];
+      if (!target) return [{ ...blankLine(), ...fill }];
+      return ls.map((l) => (l.key !== target.key ? l : {
+        ...l, ...fill,
+        ...(l.fields ? { supplier_name: l.supplier_name || fill.supplier_name!,
+          taxable_amount: l.taxable_amount || fill.taxable_amount || "",
+          cgst_amount: l.cgst_amount || fill.cgst_amount || "",
+          sgst_amount: l.sgst_amount || fill.sgst_amount || "" } : {}),
+      }));
+    });
+    setManual(true);
+    toast(`${p.label} added - ${c.period_amount ? "check the amount" : "enter the amount"}; `
+      + "the bill is optional");
+  }
 
   /** Throw away the kept form and start a blank one (defaults apply again). */
   function startOver() {
@@ -226,6 +273,7 @@ export function ExpenseForm() {
     setTypeId(""); setBranchId(""); setCentreId(""); setDeptId(""); setPeriodFrom("");
     setPeriodTo(""); setPeriodSource(""); setManual(false); setLines([blankLine()]);
     setIssues([]); setError(null); setRestoredAt(null);
+    setContract(null); setContractExtra(NO_EXTRA);
   }
 
   // Bill period read from the bill (billing / service period, "for the month of ...").
@@ -377,7 +425,6 @@ export function ExpenseForm() {
   const unchecked = lines.filter((l) => l.fields && !l.confirmed).length;
   const dupLines = lines.filter((l) => l.duplicateOf).length;
   const pending = lines.some((l) => l.reading === "pending");
-  const isPo = billType === "PO";
   const hasBills = lines.some((l) => l.id || l.reading || l.docs.length || l.taxable_amount
     || l.description);
 
@@ -395,8 +442,20 @@ export function ExpenseForm() {
       bill_type: billType,
       ...Object.fromEntries(Object.entries(details).map(([k, v]) => [k, opt(v)])),
       base_document_ids: billType === "PO" ? [] : baseDocs.map((d) => d.id),
+      ...(billType === "CONTRACT" ? {
+        contract_id: contract?.id ?? null,
+        // First time only: how the new contract is paid (the register stores it).
+        ...(contract ? {} : {
+          contract_frequency: contractExtra.frequency,
+          contract_period_amount: contractExtra.period_amount.trim() || null,
+          contract_gst_rate: contractExtra.gst_rate.trim() || null,
+        }),
+      } : {}),
       items: lines.map((l) => ({
-        id: l.id, expense_date: l.expense_date || l.bill_date, description: l.description,
+        id: l.id, expense_date: l.expense_date || l.bill_date,
+        // No description box on the form: what was read from the bill, else the supplier.
+        description: (l.description.trim() || l.supplier_name.trim() || title.trim()
+          || "Bill").slice(0, 500),
         vendor_id: l.vendor_id ? Number(l.vendor_id) : null, bill_number: l.bill_number || null,
         bill_date: l.bill_date || null, taxable_amount: money(l.taxable_amount),
         cgst_amount: money(l.cgst_amount), sgst_amount: money(l.sgst_amount),
@@ -429,13 +488,16 @@ export function ExpenseForm() {
       if (!details.approval_by_name.trim()) return "Enter who approved this expense.";
       if (!details.approval_date) return "Enter the date of the approval.";
     }
-    if (submit && billType === "CONTRACT") {
-      if (!baseDocs.length) return "Attach the contract / MSA.";
+    if (submit && billType === "CONTRACT" && !contract) {
+      if (!baseDocs.length) return "Upload the contract / MSA (only the first time).";
       if (!details.contract_reference.trim()) return "Enter the contract / MSA number.";
       if (!details.contract_start || !details.contract_end) return "Enter the contract period.";
     }
+    if (billType === "CONTRACT" && !contract && contractExtra.period_amount.trim()
+      && !MONEY_RE.test(contractExtra.period_amount.trim())) {
+      return "Amount each payment must look like 55000.00";
+    }
     for (const [i, l] of lines.entries()) {
-      if (!l.description.trim()) return `Bill ${i + 1}: add a description.`;
       if (!MONEY_RE.test(l.taxable_amount.trim())) return `Bill ${i + 1}: enter the amount like 1250.00`;
       for (const v of [l.cgst_amount, l.sgst_amount, l.igst_amount]) {
         if (v.trim() && !MONEY_RE.test(v.trim())) return `Bill ${i + 1}: tax must look like 90.00`;
@@ -516,7 +578,7 @@ export function ExpenseForm() {
 
 
   // Bills on screen: the claim details sit under the first bill, left of its preview.
-  const showLines = !(isPo && !hasBills && !manual);
+  const showLines = hasBills || manual;
   const claimFields = (
     <>
       <Field label="Title" full>
@@ -630,45 +692,21 @@ export function ExpenseForm() {
               </div>
             )}
             {billType === "CONTRACT" && (
-              <div className="form-grid form-grid-4">
-                <Field label="Contract / MSA no.">
-                  <input className="input" value={details.contract_reference} maxLength={100}
-                    onChange={(e) => setD({ contract_reference: e.target.value })} />
-                </Field>
-                <Field label="Contract with" hint="Optional">
-                  <input className="input" value={details.contract_party} maxLength={200}
-                    onChange={(e) => setD({ contract_party: e.target.value })} />
-                </Field>
-                <Field label="Starts on">
-                  <input className="input" type="date" value={details.contract_start}
-                    onChange={(e) => setD({ contract_start: e.target.value })} />
-                </Field>
-                <Field label="Ends on" hint={contractLength(details.contract_start, details.contract_end)}>
-                  <input className="input" type="date" min={details.contract_start || undefined}
-                    value={details.contract_end} onChange={(e) => setD({ contract_end: e.target.value })} />
-                </Field>
-                <Field label="Contract value" hint="Optional">
-                  <input className="input num" inputMode="decimal" placeholder="0.00"
-                    value={details.contract_value}
-                    onChange={(e) => setD({ contract_value: e.target.value })} />
-                </Field>
-                <Field label="Terms" hint="Billing cycle, notice period…" full>
-                  <input className="input" value={details.contract_terms} maxLength={500}
-                    onChange={(e) => setD({ contract_terms: e.target.value })} />
-                </Field>
-              </div>
+              <ContractPanel details={details} setD={setD} extra={contractExtra}
+                setExtra={(p) => setContractExtra((x) => ({ ...x, ...p }))}
+                contract={contract} setContract={setContract} docs={baseDocs} setDocs={setBaseDocs}
+                onClaim={claimPeriod}
+                length={contractLength(details.contract_start, details.contract_end)} />
             )}
-            {billType !== "PO" && (
+            {billType === "ADHOC" && (
               <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
-                <AttachButton allowEmail={billType === "ADHOC"}
-                  label={billType === "ADHOC" ? "Attach approval e-mail" : "Attach contract / MSA"}
+                <AttachButton allowEmail
+                  label="Attach approval e-mail"
                   onUploaded={(f) => setBaseDocs((d) => [...d, f])} />
                 {baseDocs.map((d) => <FileChip key={d.id} file={d}
                   onRemove={() => setBaseDocs((ds) => ds.filter((x) => x.id !== d.id))} />)}
                 {!baseDocs.length && <span className="small muted">
-                  {billType === "ADHOC"
-                    ? "Save the approval e-mail as PDF (or a screenshot) - required to submit."
-                    : "PDF of the signed contract - required to submit."}</span>}
+                  Save the approval e-mail as PDF (or a screenshot) - required to submit.</span>}
               </div>
             )}
           </div>
@@ -676,16 +714,18 @@ export function ExpenseForm() {
 
         <div className="card">
           <div className="card-head"><h3>{showLines ? "Bill & details" : "Bills"}</h3>
-            <span className="sub">{isPo ? "Upload the invoices - we read the company, GSTIN, bill no., "
-              + "date and GST for you to check" : "Invoice numbers are checked against every claim "
-              + "from the same company"}</span></div>
+            <span className="sub">{billType === "CONTRACT"
+              ? "Upload the bill if you have one (optional for contract payments) - we read it for you"
+              : "Upload the invoices - we read the company, GSTIN, bill no., date and GST for you to "
+              + "check"}</span></div>
           <div className="card-body">
-            {isPo && !hasBills && !manual ? (
+            {!showLines ? (
               <>
                 <BillDropzone onFiles={readBills} />
                 <div style={{ textAlign: "center", marginTop: 10 }}>
                   <button className="btn btn-ghost btn-sm" onClick={() => setManual(true)}>
-                    No bill to upload? Enter it by hand</button></div>
+                    {billType === "CONTRACT" ? "No bill? Enter the payment by hand"
+                      : "No bill to upload? Enter it by hand"}</button></div>
               </>
             ) : <>
             {lines.map((l, idx) => (
@@ -696,7 +736,7 @@ export function ExpenseForm() {
                 extra={idx === 0 ? claimFields : undefined}
                 onRemove={() => removeLine(l.key)}
                 onRemoveDoc={(docId) => removeDoc(l.key, docId)}
-                attach={isPo && !l.docs.length
+                attach={!l.docs.length
                   ? <AttachButton small label="Read bill" onRead={(r) => readInto(l.key, r)} />
                   : <AttachButton small label={l.docs.length ? "Add file" : "Attach bill"}
                     onUploaded={(f) => update(l.key, { document_ids: [...l.document_ids, f.id],
@@ -716,11 +756,11 @@ export function ExpenseForm() {
         {showLines && (
           <div className="card add-more"><div className="card-body">
             <div className="row" style={{ alignItems: "stretch" }}>
-              {isPo && hasBills && (
+              {hasBills && (
                 <div style={{ flex: 1 }}><BillDropzone compact onFiles={readBills} /></div>)}
               <button className="btn" style={{ height: "auto", minHeight: 30 }}
                 onClick={() => setLines((ls) => [...ls, blankLine()])}>
-                <Plus size={15} />{isPo ? "Line without bill" : "Add another bill"}</button>
+                <Plus size={15} />Line without bill</button>
             </div>
           </div></div>
         )}

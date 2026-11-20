@@ -387,9 +387,6 @@ export function BillLine({ line, index, vendors, rates, canRemove, onChange, onR
           <input className="input" type="date" max={today()} value={line.bill_date}
             onChange={(e) => onChange({ bill_date: e.target.value, expense_date: e.target.value
               || line.expense_date })} /></LField>
-        <div className="full"><LField line={line} name="description" label="Description">
-          <input className="input" value={line.description} maxLength={500}
-            onChange={(e) => onChange({ description: e.target.value })} /></LField></div>
         {extra}
       </div>
       <div className="tax-grid">

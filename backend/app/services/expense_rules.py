@@ -13,7 +13,7 @@ from app.core.deps import Principal
 from app.core.errors import AppError
 from app.models import BillExtraction, Expense, ExpenseItem
 from app.schemas.expense import ValidationIssue
-from app.services import invoice_check, routing_service
+from app.services import contract_service, invoice_check, routing_service
 
 ZERO = Decimal("0.00")
 EDITABLE = frozenset({"DRAFT", "RETURNED"})
@@ -221,7 +221,7 @@ def _duplicate_bill_issues(db: Session, expense: Expense) -> list[ValidationIssu
     return []
 
 
-def _bill_type_issues(expense: Expense, today: date) -> list[ValidationIssue]:
+def _bill_type_issues(db: Session, expense: Expense, today: date) -> list[ValidationIssue]:
     """The base document each type of bill needs (AP process: PO / ad-hoc / contract)."""
     out: list[ValidationIssue] = []
 
@@ -251,8 +251,16 @@ def _bill_type_issues(expense: Expense, today: date) -> list[ValidationIssue]:
                 "WARN",
             )
     elif expense.bill_type == "CONTRACT":
-        if "CONTRACT" not in kinds:
+        # The contract file is needed once: on this claim or on the stored contract.
+        if not contract_service.has_document(db, expense):
             add("CONTRACT_DOC_MISSING", "Upload the contract / MSA", "base_document_ids")
+        for other in contract_service.overlapping_claims(db, expense):
+            add(
+                "PERIOD_ALREADY_CLAIMED",
+                f"This contract period is already claimed in {other.expense_no} "
+                f"({other.status.replace('_', ' ').lower()})",
+                "bill_period_start",
+            )
         if not expense.contract_reference:
             add("CONTRACT_DETAILS_MISSING", "Enter the contract / MSA number", "contract_reference")
         if not (expense.contract_start and expense.contract_end):
@@ -354,7 +362,7 @@ def validate_for_submit(db: Session, expense: Expense) -> list[ValidationIssue]:
         )
 
     today = date.today()
-    issues.extend(_bill_type_issues(expense, today))
+    issues.extend(_bill_type_issues(db, expense, today))
     issues.extend(_bill_period_issues(expense))
     for item in expense.items:
         if item.expense_date > today:
@@ -370,7 +378,12 @@ def validate_for_submit(db: Session, expense: Expense) -> list[ValidationIssue]:
                 item,
                 "details_confirmed",
             )
-        if expense.expense_type.requires_bill and not item.documents:
+        # Contract claims (rent, AMC ...) may have no bill: the contract is the evidence.
+        if (
+            expense.expense_type.requires_bill
+            and not item.documents
+            and expense.bill_type != "CONTRACT"
+        ):
             block("MISSING_BILL", f"Line {item.line_no}: upload the bill (PDF)", item, "documents")
         issues.extend(_gst_issues(expense, item))
         issues.extend(_rate_issues(item))

@@ -27,6 +27,7 @@ from app.models import (
 from app.schemas.expense import ExpenseCreate, ExpenseIn, ExpenseOut, ExpenseUpdate
 from app.services import (
     audit_service,
+    contract_service,
     engagement_service,
     expense_rules,
     idempotency_service,
@@ -403,6 +404,8 @@ def create(
     invoice_check.assert_no_duplicates(db, expense, principal.user.id)
     _attach_bills(db, principal, expense, to_attach)
     _attach_base_docs(db, principal, expense, data.base_document_ids)
+    db.flush()
+    contract_service.link(db, principal, expense, data)
     _history(db, expense, "CREATED", None, principal.user.id)
     audit_service.record(
         db,
@@ -442,6 +445,8 @@ def update(db: Session, principal: Principal, expense_id: int, data: ExpenseUpda
     invoice_check.assert_no_duplicates(db, expense, principal.user.id)
     _attach_bills(db, principal, expense, to_attach)
     _attach_base_docs(db, principal, expense, data.base_document_ids)
+    db.flush()
+    contract_service.link(db, principal, expense, data)
     audit_service.record(
         db,
         "EXPENSE_UPDATED",

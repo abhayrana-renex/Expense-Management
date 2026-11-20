@@ -728,3 +728,20 @@ kbd { font-family: inherit; font-size: 10px; font-weight: 600; color: var(--ink-
   .filters > * { flex: 1 1 100%; min-width: 0; }
   .filters .input, .filters .select { width: 100%; min-width: 0; }
 }
+
+/* ---------- Contract register (components/ContractPanel.tsx) ---------- */
+.contract-box { display: grid; gap: 10px; }
+.contract-head { display: flex; align-items: flex-start; gap: 10px; color: var(--brand-600); }
+.contract-head > svg { flex: none; margin-top: 2px; }
+.contract-title { flex: 1; min-width: 0; color: var(--ink-900); }
+.contract-due { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px;
+  border-radius: var(--r-md); border: 1px solid #f6d9ad; background: var(--amber-50); color: #7a4100; }
+.contract-due > svg { flex: none; }
+.contract-due.idle { border-color: var(--brand-100); background: var(--brand-50); color: var(--brand-700); }
+.contract-periods { display: flex; flex-wrap: wrap; gap: 6px; }
+.contract-results { display: grid; gap: 6px; }
+.contract-result { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-md); background: #fff;
+  cursor: pointer; font: inherit; color: var(--brand-600); }
+.contract-result:hover { border-color: var(--brand-500); background: var(--brand-50); }
+.contract-result .pill { flex: none; }

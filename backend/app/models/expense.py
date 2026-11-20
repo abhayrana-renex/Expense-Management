@@ -133,6 +133,10 @@ class Expense(IdMixin, TimestampMixin, Base):
     contract_end: Mapped[date | None] = mapped_column(Date)
     contract_value: Mapped[Decimal | None] = mapped_column(MONEY)
     contract_terms: Mapped[str | None] = mapped_column(String(500))  # billing cycle, notice...
+    # The stored contract this claim pays a period of (contract register, migration 0011).
+    contract_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("contracts.id"), index=True
+    )
 
     # Snapshot at submission so later master changes never rewrite what auditors see.
     snapshot_department_name: Mapped[str | None] = mapped_column(String(150))

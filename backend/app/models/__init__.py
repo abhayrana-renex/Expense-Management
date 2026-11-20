@@ -2,6 +2,7 @@
 
 from app.models.audit import AuditLog, IdempotencyRecord
 from app.models.base import Base
+from app.models.contract import Contract
 from app.models.engagement import Delegation, Notification
 from app.models.expense import (
     ApprovalStep,
@@ -41,6 +42,7 @@ __all__ = [
     "Base",
     "BillMonth",
     "Branch",
+    "Contract",
     "CostCentre",
     "Department",
     "Expense",

@@ -97,6 +97,20 @@ class ExpenseIn(BaseModel):
     contract_terms: str | None = Field(
         None, max_length=500, description="Billing cycle, notice period, etc."
     )
+    contract_id: int | None = Field(
+        None,
+        description="CONTRACT: the stored contract (GET /contracts) this claim pays a "
+        "period of. Omit the first time: the contract is registered from the details above.",
+    )
+    contract_frequency: (
+        Literal["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY", "ONE_TIME"] | None
+    ) = Field(None, description="CONTRACT, first claim: how often it is paid")
+    contract_period_amount: Money | None = Field(
+        None, description="CONTRACT, first claim: amount (pre-tax) due each period"
+    )
+    contract_gst_rate: Decimal | None = Field(
+        None, ge=0, le=100, decimal_places=2, description="CONTRACT, first claim: GST %"
+    )
     base_document_ids: list[int] = Field(
         default_factory=list,
         max_length=10,
@@ -223,6 +237,7 @@ class ExpenseOut(ExpenseSummaryOut):
     contract_end: date | None
     contract_value: Money | None
     contract_terms: str | None
+    contract_id: int | None = None
     base_documents: list[DocumentOut]
     payment_mode: str | None
     payment_reference: str | None

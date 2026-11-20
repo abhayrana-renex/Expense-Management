@@ -422,7 +422,7 @@ function CorrectDialog({ expense, onClose, onDone }: { expense: Expense; onClose
   const total = sumMoney(lines.map((l) => sumMoney([l.taxable_amount, l.cgst_amount,
     l.sgst_amount, l.igst_amount])));
   const money = (v: string) => (v.trim() === "" ? "0.00" : v.trim());
-  const bad = lines.some((l) => !MONEY_RE.test(l.taxable_amount.trim()) || !l.description.trim()
+  const bad = lines.some((l) => !MONEY_RE.test(l.taxable_amount.trim())
     || (l.supplier_gstin !== "" && !GSTIN_RE.test(l.supplier_gstin)) || !!l.duplicateOf);
   async function save() {
     setBusy(true);
@@ -431,7 +431,9 @@ function CorrectDialog({ expense, onClose, onDone }: { expense: Expense; onClose
       await api.put(`/expenses/${expense.id}/correction`, {
         comment, version: expense.version,
         items: lines.map((l) => ({
-          id: l.id, description: l.description, vendor_id: l.vendor_id ? Number(l.vendor_id) : null,
+          id: l.id,
+          description: (l.description.trim() || l.supplier_name.trim() || "Bill").slice(0, 500),
+          vendor_id: l.vendor_id ? Number(l.vendor_id) : null,
           bill_number: l.bill_number || null, bill_date: l.bill_date || null,
           taxable_amount: money(l.taxable_amount), cgst_amount: money(l.cgst_amount),
           sgst_amount: money(l.sgst_amount), igst_amount: money(l.igst_amount),

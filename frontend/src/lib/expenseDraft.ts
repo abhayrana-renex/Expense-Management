@@ -14,6 +14,7 @@
  */
 import type { Dispatch, SetStateAction } from "react";
 import type { Line } from "../components/BillLine";
+import type { ContractExtra } from "../components/ContractPanel";
 
 const PREFIX = "ep:new-expense:";
 const DRAFT_DAYS = 7;
@@ -36,6 +37,9 @@ export interface ExpenseDraft {
     manual: boolean;
     lines: Line[];
     touched: { title: boolean; purpose: boolean; period: boolean; centre: boolean };
+    /** CONTRACT: the stored contract picked, and the first-time payment details. */
+    contractId?: number | null;
+    contractExtra?: ContractExtra;
   };
 }
 

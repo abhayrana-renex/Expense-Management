@@ -139,6 +139,8 @@ export interface Expense extends ExpenseSummary {
   contract_end: string | null;
   contract_value: Money | null;
   contract_terms: string | null;
+  /** The stored contract (contract register) this claim pays a period of. */
+  contract_id: number | null;
   base_documents: DocumentInfo[];
   payment_scheduled_by?: UserRef | null;
   payment_approved_by?: UserRef | null;
@@ -311,6 +313,31 @@ export interface EmailRead {
 
 /** Only these are ever shown inline; e-mails and anything else are downloads. */
 export const PREVIEWABLE = ["application/pdf", "image/jpeg", "image/png"];
+
+// ---------- Contract register (GET /contracts) ----------
+export type ContractFrequency = "MONTHLY" | "QUARTERLY" | "HALF_YEARLY" | "YEARLY" | "ONE_TIME";
+export interface ContractPeriod {
+  start: string; end: string; label: string;
+  /** PAID | CLAIMED | DUE | OVERDUE | UPCOMING */
+  status: "PAID" | "CLAIMED" | "DUE" | "OVERDUE" | "UPCOMING";
+  expense_id: number | null; expense_no: string | null; expense_status: string | null;
+}
+export interface Contract {
+  id: number; contract_no: string; title: string | null; party_name: string;
+  vendor: { id: number; name: string } | null;
+  start_date: string; end_date: string; frequency: ContractFrequency;
+  period_amount: Money | null; gst_rate: string | null; contract_value: Money | null;
+  terms: string | null; department_id: number | null; branch_id: number | null;
+  expense_type_id: number | null; has_document: boolean; is_active: boolean;
+  schedule?: { periods: ContractPeriod[]; current: ContractPeriod | null;
+    next_due: ContractPeriod | null; claimed: number; due: number; ended: boolean } | null;
+}
+/** POST /contracts/read: the stored file, what was read, and the stored contract if known. */
+export interface ContractRead {
+  document: BillRead["document"];
+  fields: Record<string, ExtractedField>;
+  existing: Contract | null;
+}
 
 export interface BillRead {
   document: { id: number; original_filename: string; content_type: string; size_bytes: number;
