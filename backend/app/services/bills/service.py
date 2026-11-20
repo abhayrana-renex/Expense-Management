@@ -14,22 +14,14 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.deps import Principal
 from app.core.errors import AppError
-from app.models import BillExtraction, ExpenseDocument, ExpenseType
+from app.models import BillExtraction, ExpenseDocument
 from app.services import audit_service, document_service
-from app.services.bills import email_import, parser, qr, reader
+from app.services.bills import category, email_import, parser, qr, reader
 from app.services.bills.vendor_match import match_vendor
 
 log = logging.getLogger("app.bills")
 SURE_VENDOR = 0.6  # below this a vendor is suggested, not filled in
 ENGINE = "qr+pdfplumber+rapidocr(PP-OCRv4)"
-
-
-def _category_id(db: Session, code: str | None) -> int | None:
-    if not code:
-        return None
-    return db.execute(
-        select(ExpenseType.id).where(ExpenseType.code == code, ExpenseType.is_active.is_(True))
-    ).scalar()
 
 
 def _read_and_parse(data: bytes, content_type: str) -> tuple[reader.ReadResult, parser.Parsed]:
@@ -153,13 +145,24 @@ def extract_new_bill(db: Session, principal: Principal, filename: str, data: byt
             "confidence": fields.get("vendor_name", {}).get("confidence", 0.5),
             "source": "bill header (largest / coloured text first)",
         }
-    cat_id = _category_id(db, parsed.get("category_code"))
-    if cat_id:
-        f = parsed.fields["category_code"]
+    # Category from everything on the bill: past claims for this vendor, the HSN/SAC code,
+    # keywords, then the most related category by the bill's words (bills/category.py).
+    rule = parsed.fields.get("category_code")
+    cat = category.guess(
+        db,
+        text=read.text,
+        vendor_name=parsed.get("vendor_name"),
+        hsn=parsed.get("hsn_sac"),
+        vendor_id=fields.get("vendor_id", {}).get("value"),
+        gstin=parsed.get("vendor_gstin"),
+        rule_code=parsed.get("category_code"),
+        rule_confidence=rule.confidence if rule else 0.0,
+    )
+    if cat:
         fields["expense_type_id"] = {
-            "value": cat_id,
-            "confidence": round(f.confidence, 2),
-            "source": f.source,
+            "value": cat.type_id,
+            "confidence": cat.confidence,
+            "source": cat.source,
         }
     warnings = read.warnings + parsed.warnings
     if not fields.get("vendor_gstin") and "ocr" not in read.method and fields.get("total_amount"):

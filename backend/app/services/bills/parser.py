@@ -836,12 +836,24 @@ def _description(lines: list[str], category: str | None, vendor: str | None) -> 
     return f"Bill from {vendor}"[:120] if vendor else None
 
 
+_KW_CACHE: dict[str, re.Pattern[str]] = {}
+
+
+def _kw(word: str) -> re.Pattern[str]:
+    w = word.strip().lower()
+    if w not in _KW_CACHE:
+        _KW_CACHE[w] = re.compile(r"(?<![a-z0-9])" + re.escape(w) + r"(?![a-z0-9])")
+    return _KW_CACHE[w]
+
+
 def _category(text: str, vendor: str | None) -> tuple[str | None, float]:
     hay = f" {text.lower()} "
     name = f" {(vendor or '').lower()} "
     scores = {}
     for code, words in CATEGORY_KEYWORDS.items():
-        s = sum(hay.count(w) for w in words) + 3 * sum(name.count(w) for w in words)
+        # Whole words only: "rent" must not match "current", "fare" not "software",
+        # "ride" not "provider", "cab" not "cable".
+        s = sum(len(_kw(w).findall(hay)) + 3 * len(_kw(w).findall(name)) for w in words)
         if s:
             scores[code] = s
     if not scores:
