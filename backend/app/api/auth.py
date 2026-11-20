@@ -15,7 +15,7 @@ from app.schemas.auth import (
     UserOut,
 )
 from app.schemas.common import ErrorResponse, Message
-from app.services import auth_service
+from app.services import auth_service, expense_defaults
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -65,7 +65,10 @@ def logout(
     "`permissions` maps each permission to its data scope (OWN, ASSIGNED, "
     "DEPARTMENT, ALL).",
 )
-def me(principal: Principal = Depends(get_principal_allow_password_change)) -> dict:
+def me(
+    principal: Principal = Depends(get_principal_allow_password_change),
+    db: Session = Depends(get_db),
+) -> dict:
     user = principal.user
     return {
         "user": UserOut.model_validate(user),
@@ -82,6 +85,7 @@ def me(principal: Principal = Depends(get_principal_allow_password_change)) -> d
             "history_count": settings.PASSWORD_HISTORY_COUNT,
             "expiry_days": settings.PASSWORD_EXPIRY_DAYS,
         },
+        "expense_defaults": expense_defaults.for_user(db, user),
     }
 
 

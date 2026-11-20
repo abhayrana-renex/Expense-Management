@@ -64,6 +64,11 @@ class MeOut(BaseModel):
     password_expired: bool
     feature_flags: dict[str, bool]
     password_policy: dict[str, int]
+    expense_defaults: dict[str, int | None] = Field(
+        description="Pre-fill for a new expense: department_id, branch_id, cost_centre_id "
+        "(DEFAULT_DEPARTMENT / DEFAULT_BRANCH, else the user's own; the cost centre linked "
+        "to that department). The user can change each one."
+    )
 
 
 class UserCreate(BaseModel):

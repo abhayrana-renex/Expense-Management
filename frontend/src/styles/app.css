@@ -644,3 +644,5 @@ kbd { font-family: inherit; font-size: 10px; font-weight: 600; color: var(--ink-
 .kpi-btn .kpi-icon { background: var(--brand-50); color: var(--brand-700); }
 .pay-tabs { overflow-x: auto; }
 .pay-bar { flex-wrap: wrap; background: #fcfcfd; border-bottom: 1px solid var(--line); }
+.toast-action { margin-left: auto; border: 0; background: transparent; color: #fff; font-weight: 600;
+  text-decoration: underline; cursor: pointer; padding: 0 0 0 10px; font-size: var(--fs-sm); }

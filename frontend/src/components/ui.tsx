@@ -126,16 +126,20 @@ export function Field({ label, hint, children, full }: {
 }
 
 // ---------- Toasts ----------
-interface Toast { id: number; text: string; kind: "ok" | "error" }
-const ToastCtx = createContext<(text: string, kind?: "ok" | "error") => void>(() => {});
+/** An optional button on a toast, e.g. Undo after removing something. */
+export interface ToastAction { label: string; run: () => void }
+interface Toast { id: number; text: string; kind: "ok" | "error"; action?: ToastAction }
+type Push = (text: string, kind?: "ok" | "error", action?: ToastAction) => void;
+const ToastCtx = createContext<Push>(() => {});
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<Toast[]>([]);
-  const push = useCallback((text: string, kind: "ok" | "error" = "ok") => {
+  const drop = useCallback((id: number) => setItems((t) => t.filter((x) => x.id !== id)), []);
+  const push = useCallback<Push>((text, kind = "ok", action) => {
     const id = Date.now() + Math.random();
-    setItems((t) => [...t, { id, text, kind }]);
-    setTimeout(() => setItems((t) => t.filter((x) => x.id !== id)), 4000);
-  }, []);
+    setItems((t) => [...t, { id, text, kind, action }]);
+    setTimeout(() => drop(id), action ? 8000 : 4000); // time to reach Undo
+  }, [drop]);
   return (
     <ToastCtx.Provider value={push}>
       {children}
@@ -144,6 +148,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div key={t.id} className={`toast ${t.kind === "error" ? "error" : ""}`}>
             {t.kind === "error" ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
             {t.text}
+            {t.action && (
+              <button className="toast-action" onClick={() => { t.action!.run(); drop(t.id); }}>
+                {t.action.label}</button>
+            )}
           </div>
         ))}
       </div>

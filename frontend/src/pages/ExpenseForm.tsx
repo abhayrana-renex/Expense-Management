@@ -126,6 +126,7 @@ export function ExpenseForm() {
     setTitle(`${src.title} (copy)`.slice(0, 200)); setPurpose(src.purpose ?? "");
     setTypeId(String(src.expense_type.id)); setBranchId(String(src.branch.id));
     setCentreId(src.cost_centre ? String(src.cost_centre.id) : "");
+    centreTouched.current = true; // a copy keeps its own cost centre
     setDeptId(String(src.department.id));
     setLines(src.items.map((i) => ({
       ...lineFromItem(i), key: crypto.randomUUID(), id: undefined, docs: [], document_ids: [],
@@ -133,13 +134,29 @@ export function ExpenseForm() {
     })));
   }, [editing, location.state]);
 
+  // New expense: department, branch and cost centre start from the portal defaults (IT /
+  // Gurgaon today, set by the admin in the server settings), else the person's own.
+  const defaults = me?.expense_defaults;
   useEffect(() => {
-    if (!editing && !branchId && me?.user.branch) setBranchId(String(me.user.branch.id));
-  }, [editing, branchId, me]);
+    if (editing) return;
+    const branch = defaults?.branch_id ?? me?.user.branch?.id;
+    if (!branchId && branch) setBranchId(String(branch));
+  }, [editing, branchId, me, defaults]);
 
   useEffect(() => {
-    if (!editing && !deptId && me?.user.department) setDeptId(String(me.user.department.id));
-  }, [editing, deptId, me]);
+    if (editing) return;
+    const dept = defaults?.department_id ?? me?.user.department?.id;
+    if (!deptId && dept) setDeptId(String(dept));
+  }, [editing, deptId, me, defaults]);
+
+  // The cost centre follows the department (its linked cost centre) until the person picks
+  // one themselves.
+  const centreTouched = useRef(false);
+  useEffect(() => {
+    if (editing || centreTouched.current || !deptId || !centres.data) return;
+    const linked = centres.data.find((c) => String(c.department_id ?? "") === deptId);
+    setCentreId(linked ? String(linked.id) : "");
+  }, [editing, deptId, centres.data]);
 
   // Bill period read from the bill (billing / service period, "for the month of ...").
   useEffect(() => {
@@ -250,6 +267,34 @@ export function ExpenseForm() {
   const update = (key: string, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const setD = (patch: Partial<TypeDetails>) => setDetails((d) => ({ ...d, ...patch }));
+
+  /** Remove a bill line without cancelling the claim. The last line is cleared instead, which
+   *  brings back the upload box. Undo puts everything back. The file stays stored (staged,
+   *  visible only to its uploader) and is never attached unless the line is restored. */
+  function removeLine(key: string) {
+    const before = lines;
+    const wasManual = manual;
+    const gone = lines.find((l) => l.key === key);
+    if (lines.length > 1) {
+      setLines((ls) => ls.filter((l) => l.key !== key));
+    } else {
+      setLines([blankLine()]);
+      setManual(false);
+    }
+    toast(`Removed ${gone?.docs[0]?.name ?? gone?.supplier_name ?? "the bill"}`, "ok",
+      { label: "Undo", run: () => { setLines(before); setManual(wasManual); } });
+  }
+
+  /** Take one file off a line (e.g. a wrong extra file); the line's details stay. */
+  function removeDoc(key: string, docId: number) {
+    const line = lines.find((l) => l.key === key);
+    const doc = line?.docs.find((d) => d.id === docId);
+    if (!line || !doc) return;
+    update(key, { docs: line.docs.filter((d) => d.id !== docId),
+      document_ids: line.document_ids.filter((d) => d !== docId) });
+    toast(`Removed ${doc.name}`, "ok", { label: "Undo", run: () => update(key, {
+      docs: line.docs, document_ids: line.document_ids }) });
+  }
 
   const total = useMemo(() => sumMoney(lines.map((l) => sumMoney([l.taxable_amount,
     l.cgst_amount, l.sgst_amount, l.igst_amount]))), [lines]);
@@ -421,7 +466,8 @@ export function ExpenseForm() {
         </Select>
       </Field>
       <Field label="Cost centre" hint="Optional">
-        <Select className="select" value={centreId} onChange={(e) => setCentreId(e.target.value)}>
+        <Select className="select" value={centreId}
+          onChange={(e) => { centreTouched.current = true; setCentreId(e.target.value); }}>
           <option value="">None</option>
           {centres.data?.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
         </Select>
@@ -556,9 +602,11 @@ export function ExpenseForm() {
             {lines.map((l, idx) => (
               <BillLine key={l.key} line={l} index={idx} vendors={vendors.data ?? []}
                 rates={rates.data ?? []} expenseId={editing ? Number(id) : undefined}
-                canRemove={lines.length > 1} onChange={(patch) => update(l.key, patch)}
+                canRemove={lines.length > 1 || l.docs.length > 0 || !!l.reading}
+                onChange={(patch) => update(l.key, patch)}
                 extra={idx === 0 ? claimFields : undefined}
-                onRemove={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
+                onRemove={() => removeLine(l.key)}
+                onRemoveDoc={(docId) => removeDoc(l.key, docId)}
                 attach={isPo && !l.docs.length
                   ? <AttachButton small label="Read bill" onRead={(r) => readInto(l.key, r)} />
                   : <AttachButton small label={l.docs.length ? "Add file" : "Attach bill"}

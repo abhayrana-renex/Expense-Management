@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     FEATURE_BILL_READER: bool = True
     # band: ONE approver chosen by amount (L1 / L2 / L3 bands). chain: L1 -> L2 -> L3 in turn.
     APPROVAL_ROUTING: Literal["band", "chain"] = "band"
+    # New expense pre-fill for everyone (FAR names, any case). Empty = the person's own
+    # department / branch. The cost centre follows the department.
+    DEFAULT_DEPARTMENT: str = ""
+    DEFAULT_BRANCH: str = ""
     # Bulk approve is only offered for claims at or below this amount (and with no warnings).
     BULK_APPROVE_MAX_AMOUNT: Decimal = Decimal("50000.00")
 

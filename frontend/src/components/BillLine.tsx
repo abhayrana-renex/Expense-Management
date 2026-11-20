@@ -1,10 +1,11 @@
 import { Select } from "./Select";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, FileText, ScanLine, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ScanLine, Trash2, Upload } from "lucide-react";
 import { api } from "../api/client";
 import type { BillRead, ExtractedField, GstRate, InvoiceCheck, MasterRow } from "../api/types";
 import { PREVIEWABLE } from "../api/types";
+import { FileChip } from "./BillType";
 import { inr, percentOf, sumMoney, today } from "../lib/format";
 
 export interface Line {
@@ -270,9 +271,11 @@ function useInvoiceCheck(line: Line, expenseId: number | undefined,
 }
 
 export function BillLine({ line, index, vendors, rates, canRemove, onChange, onRemove, attach,
-  expenseId, showRates = false, extra }: {
+  expenseId, showRates = false, extra, onRemoveDoc }: {
   line: Line; index: number; vendors: MasterRow[]; rates: GstRate[]; canRemove: boolean;
   onChange: (patch: Partial<Line>) => void; onRemove: () => void;
+  /** Take one uploaded file off this line (the x on its chip). */
+  onRemoveDoc?: (documentId: number) => void;
   /** Upload control shown in the line header. */
   attach?: ReactNode;
   /** The expense being edited (its own lines are not duplicates of themselves). */
@@ -426,8 +429,8 @@ export function BillLine({ line, index, vendors, rates, canRemove, onChange, onR
             <Preview doc={line.docs.find((d) => PREVIEWABLE.includes(d.content_type))} />
             <div className="row small" style={{ marginTop: 6, flexWrap: "wrap" }}>
               {line.docs.map((d) => (
-                <a key={d.id} href="#" className="doc-chip" onClick={(e) => { e.preventDefault();
-                  api.openDocument(d.id); }}><FileText size={13} />{d.name}</a>))}
+                <FileChip key={d.id} file={d}
+                  onRemove={onRemoveDoc ? () => onRemoveDoc(d.id) : undefined} />))}
             </div>
           </div>
         </div>
