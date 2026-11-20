@@ -290,8 +290,9 @@ export interface RoleInfo { id: number; code: string; name: string; description:
 
 // ---------- Bill reader ----------
 export interface ExtractedField {
-  /** boolean: supplier_msme; list: vendor_candidates (header names, best first). */
-  value: string | number | boolean | string[] | null;
+  /** boolean: supplier_msme; list: vendor_candidates (header names, best first);
+   *  {id, name} list: vendor_suggestions (vendors to offer first, best first). */
+  value: string | number | boolean | string[] | { id: number; name: string }[] | null;
   /** 0..1: how sure the reader is. */
   confidence: number;
   /** e-invoice QR, UPI QR, text, table, computed, vendor list (...), keywords, inferred */

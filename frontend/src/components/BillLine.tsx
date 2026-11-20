@@ -310,6 +310,13 @@ export function BillLine({ line, index, vendors, rates, canRemove, onChange, onR
   const read = !!line.fields;
   const total = sumMoney([line.taxable_amount, line.cgst_amount, line.sgst_amount, line.igst_amount]);
   const vendorMatch = line.fields?.vendor_id;
+  // Vendors the reader found for this bill (same name, brand, first name, relationship no.):
+  // listed first in the vendor dropdown. Only Active vendors still in the list are shown.
+  const suggestedIds = new Set(
+    (Array.isArray(line.fields?.vendor_suggestions?.value)
+      ? (line.fields!.vendor_suggestions!.value as { id: number }[]) : [])
+      .map((s) => String(s.id)));
+  const suggested = vendors.filter((v) => suggestedIds.has(String(v.id)));
 
   const form = (
     <div>
@@ -343,8 +350,15 @@ export function BillLine({ line, index, vendors, rates, canRemove, onChange, onR
                 ...(v ? { supplier_msme: v.is_msme ? "yes" : "no" } : {}) });
             }}>
             <option value="">Not in vendor list</option>
-            {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+            {suggested.length > 0 && <option disabled value="__from_bill">── From the bill ──</option>}
+            {suggested.map((v) => <option key={`s${v.id}`} value={v.id}>{v.name}</option>)}
+            {suggested.length > 0 && <option disabled value="__all">── All vendors ──</option>}
+            {vendors.filter((v) => !suggestedIds.has(String(v.id)))
+              .map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </Select>
+          {suggested.length > 1 && (
+            <span className="hint">{suggested.length} vendors match the bill - check it is the
+              right one</span>)}
           {read && !vendorMatch && line.supplier_name && (
             <span className="hint">No vendor matched “{line.supplier_name}”.</span>)}
         </LField>

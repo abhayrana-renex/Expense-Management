@@ -105,10 +105,24 @@ def extract_new_bill(db: Session, principal: Principal, filename: str, data: byt
             "label": vendor["name"],
         }
         if vendor.get("same_name"):
-            parsed.warnings.append(
-                f"{len(vendor['same_name'])} vendors have this name and no relationship number "
-                f"on the bill matched one - pick the right vendor: {', '.join(vendor['same_name'])}"
-            )
+            names = ", ".join(vendor["same_name"])
+            if vendor["match"].startswith("same first name"):
+                note = f"Vendors with the same first name as the bill - pick the right one: {names}"
+            elif vendor["match"].startswith("brand"):
+                note = f"Several vendors carry this name - pick the right one: {names}"
+            else:
+                note = (
+                    f"{len(vendor['same_name'])} vendors have this name and no relationship "
+                    f"number on the bill matched one - pick the right vendor: {names}"
+                )
+            parsed.warnings.append(note)
+        if vendor.get("suggestions"):
+            # Shown at the top of the vendor list on the bill line ("From the bill").
+            fields["vendor_suggestions"] = {
+                "value": vendor["suggestions"],
+                "confidence": vendor["confidence"],
+                "source": "vendor list (name / first name / relationship no.)",
+            }
     if parsed.vendor_candidates:
         fields["vendor_candidates"] = {
             "value": parsed.vendor_candidates,

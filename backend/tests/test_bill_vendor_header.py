@@ -211,8 +211,10 @@ def test_brand_without_known_account_asks_which_vendor(db):
     db.flush()
     hit = match_vendor(db, "Zephyrtel Telecom Limited", None, text=TELECOM_BILL)
     assert hit["confidence"] < 0.5 and len(hit["same_name"]) == 2
-    # A person's name (an e-mail signature) never brand-matches an employee vendor.
-    assert match_vendor(db, "Ramesh Gupta", None, text="Ramesh Gupta\nThanks") is None
+    # A person's name is never a brand match: an employee vendor with the same first name is
+    # only suggested, at low confidence, for the person to confirm.
+    person = match_vendor(db, "Ramesh Gupta", None, text="Ramesh Gupta\nThanks")
+    assert person["match"] == "same first name" and person["confidence"] < 0.5
 
 
 TALLY_BILL = """TAX INVOICE (ORIGINAL FOR RECIPIENT)
@@ -251,6 +253,20 @@ def test_hsn_never_taken_from_inside_a_pan():
     assert p.get("hsn_sac") is None
 
 
+def test_short_vendor_name_connects_by_first_name(db):
+    for name in ("Tata", "Tata Motors Ltd", "Zorvex", "Ravi Kumar-1765-E"):
+        db.add(Partner(type="Vendor", name=name, status="Active"))
+    db.flush()
+    tata = match_vendor(db, "TATA TELE BUSINESS SERVICES LIMITED", None)
+    assert tata["name"] == "Tata" and tata["match"] == "first name"
+    assert tata["confidence"] >= 0.8
+    zorvex = match_vendor(db, "Kalpana Traders", None, candidates=["Zorvex Data Services Pvt Ltd"])
+    assert zorvex["name"] == "Zorvex" and zorvex["match"] == "first name"
+    # A person's first name is never enough to connect (only a low-confidence suggestion).
+    ravi = match_vendor(db, "Ravi Traders Pvt Ltd", None)
+    assert ravi is None or ravi["confidence"] < 0.5
+
+
 def test_emailed_text_does_not_guess_pin_code_or_sign_off():
     body = (
         "From: Priya Verma <priya@example.com>\nSubject: Bills - telecom\n"
@@ -260,3 +276,27 @@ def test_emailed_text_does_not_guess_pin_code_or_sign_off():
     assert p.get("total_amount") is None
     assert p.get("vendor_name") not in {"Best Regards", "Pls upload and confirm."}
     assert not any("@" in c for c in p.vendor_candidates)
+
+
+def test_same_first_name_is_suggested_for_the_person_to_pick(db):
+    for name in ("Gopal Krishna-1801-E", "Gopal Verma - Adv", "Meera Stationers"):
+        db.add(Partner(type="Vendor", name=name, status="Active"))
+    db.flush()
+    hit = match_vendor(db, "GOPAL PRINTING PRESS", None)
+    assert hit["match"] == "same first name (several vendors)"
+    assert hit["confidence"] < 0.5  # never treated as a sure match
+    offered = {s["name"] for s in hit["suggestions"]}
+    assert offered == {"Gopal Krishna-1801-E", "Gopal Verma - Adv"}
+    # Generic first words ("Shree", "Tax", "Invoice") never suggest anyone.
+    assert match_vendor(db, "Tax Invoice", None) is None
+
+
+def test_every_match_lists_suggestions(db):
+    for name in ("Ramesh Kumar Yadav-1801-E", "Ramesh Kumar Yadav-1802-E"):
+        db.add(Partner(type="Vendor", name=name, status="Active"))
+    db.flush()
+    hit = match_vendor(db, "Ramesh Kumar Yadav", None, text="Total 500.00")
+    assert {s["name"] for s in hit["suggestions"]} == {
+        "Ramesh Kumar Yadav-1801-E",
+        "Ramesh Kumar Yadav-1802-E",
+    }

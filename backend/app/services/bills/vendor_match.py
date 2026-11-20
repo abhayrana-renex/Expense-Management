@@ -8,6 +8,9 @@
    is printed on the bill (labelled, or as a stand-alone number) wins. When the number is
    not on the bill, the best name is offered with low confidence and the others listed, so
    the person picks the right one - nothing is applied without their check.
+4. No close name: a vendor whose whole FAR name is how a company name on the bill starts
+   ("Tata" for "Tata Tele Business Services Ltd") is connected as "first name"; a vendor whose
+   first word merely appears there is only suggested ("brand name", low confidence).
 """
 
 import re
@@ -26,10 +29,44 @@ NAME_WITH_NUMBER = 0.75  # looser when the relationship number is on the bill to
 SAME_NAME = 0.02  # within this of the best = "the same name"
 COMPANY = re.compile(
     r"\b(pvt\.?|private|ltd\.?|limited|llp|enterprises?|traders?|industries|corporation|"
-    r"corp\.?|technologies|communications|telecom|infotech|associates|agenc(y|ies))\b",
+    r"corp\.?|technologies|communications|telecom|infotech|associates|agenc(y|ies)|"
+    r"services|solutions|systems|networks)\b",
     re.I,
 )
+FIRST_NAME_CONFIDENCE = 0.8  # vendor "Tata" = how "Tata Tele Business Services Ltd" starts
 LONG_NUMBER = 7  # account-style numbers (telecom, utilities): unique enough on their own
+MAX_SUGGESTIONS = 10  # vendors offered at the top of the vendor list on the bill line
+# Words that start header lines but are not anyone's name.
+NOT_A_NAME = {
+    "tax",
+    "invoice",
+    "bill",
+    "original",
+    "duplicate",
+    "copy",
+    "your",
+    "from",
+    "for",
+    "summary",
+    "description",
+    "account",
+    "total",
+    "amount",
+    "payment",
+    "receipt",
+    "subject",
+    "dear",
+    "best",
+    "regards",
+    "thanks",
+    "this",
+    "pls",
+    "please",
+    "drug",
+    "licence",
+    "license",
+    "new",
+}
 # Words that say nothing about who the vendor is (never used as a brand on their own).
 GENERIC = {
     "india",
@@ -119,7 +156,7 @@ def _first_word(name: str) -> str | None:
     is too common to identify anyone."""
     m = re.match(r"\W*([a-z]+)", name.lower())
     word = m.group(1) if m else ""
-    return word if len(word) >= 5 and word not in GENERIC else None
+    return word if len(word) >= 4 and word not in GENERIC else None
 
 
 def _by_pan(vendors: list[Partner], gstin: str) -> Partner | None:
@@ -174,11 +211,13 @@ def match_vendor(
     bill_words = _words(text) | {w for t in targets for w in _words(t)}
     # Brand words come only from company-style names ("Bharti Airtel Limited"), never from
     # a person's name, which would match any employee vendor with that first name.
-    header_words = {
-        w for n in [name, *(candidates or [])] if n and COMPANY.search(n) for w in _words(n)
-    }
+    company_names = [norm_name(n) for n in [name, *(candidates or [])] if n and COMPANY.search(n)]
+    header_words = {w for n in company_names for w in _words(n)}
     rows: list[tuple[float, bool, Partner]] = []  # (name similarity, number on bill, vendor)
     brand: list[Partner] = []  # vendor's own name word is in the bill header
+    # Vendor's whole name is how a company name on the bill starts ("Tata" -> "Tata Tele
+    # Business Services Ltd"): FAR often keeps just the short name.
+    leading: list[Partner] = []
     for partner in vendors:
         base, number = extras.split_relationship(partner.name)
         cand = norm_name(base)
@@ -194,41 +233,72 @@ def match_vendor(
             rows.append((ratio, number_hit, partner))
         elif (first := _first_word(base)) and first in header_words:
             brand.append(partner)
+            if not number and any(n == cand or n.startswith(cand + " ") for n in company_names):
+                leading.append(partner)
+    # Same first name as a name on the bill ("Ravi Traders" -> "Ravi Kumar-1765-E"): only
+    # ever suggested, at low confidence, for the person to pick from.
+    firsts = [w for t in targets if (w := _bill_first_word(t))]
+    first_hits = sorted(
+        (
+            (
+                max(
+                    _similarity(norm_name(extras.split_relationship(p.name)[0]), t) for t in targets
+                ),
+                p,
+            )
+            for p in vendors
+            if _vendor_first_word(p.name) in firsts
+        ),
+        key=lambda r: -r[0],
+    )
+    rows.sort(key=lambda r: (r[1], r[0]), reverse=True)  # relationship number first
+    suggestions = _unique([r[2] for r in rows] + leading + brand + [p for _, p in first_hits])
+
+    def result(best: Partner, match: str, confidence: float, same: list[str] | None = None):
+        out = {"id": best.id, "name": best.name, "match": match, "confidence": confidence}
+        if same and len(same) > 1:
+            out["same_name"] = same[:MAX_SUGGESTIONS]
+        out["suggestions"] = [{"id": s.id, "name": s.name} for s in suggestions]
+        return out
+
     if not rows:
-        if not brand:
-            return None
-        # "For Bharti Airtel Limited" vs "Airtel-Meerut-...", "Airtel - JAIPUR-...": the
-        # brand is right but the account isn't in FAR (or not on the bill): ask, don't guess.
-        names = [b.name for b in brand]
-        return {
-            "id": brand[0].id,
-            "name": brand[0].name,
-            "match": "brand name" if len(brand) == 1 else "brand name (several vendors)",
-            "confidence": 0.45,
-            **({"same_name": names[:10]} if len(brand) > 1 else {}),
-        }
-    # A vendor whose relationship number is on the bill beats a slightly closer name.
-    rows.sort(key=lambda r: (r[1], r[0]), reverse=True)
+        if len(leading) == 1:
+            return result(leading[0], "first name", FIRST_NAME_CONFIDENCE)
+        if brand:
+            # "For Bharti Airtel Limited" vs "Airtel-Meerut-...", "Airtel - JAIPUR-...": the
+            # brand is right but the account isn't in FAR (or not on the bill): ask, don't guess.
+            many = len(brand) > 1
+            match = "brand name (several vendors)" if many else "brand name"
+            return result(brand[0], match, 0.45, [b.name for b in brand])
+        if first_hits:
+            many = len(first_hits) > 1
+            match = "same first name (several vendors)" if many else "same first name"
+            return result(first_hits[0][1], match, 0.4, [p.name for _, p in first_hits])
+        return None
     ratio, number_hit, best = rows[0]
     if number_hit:
-        return {
-            "id": best.id,
-            "name": best.name,
-            "match": "name + relationship no.",
-            "confidence": 0.97,
-        }
+        return result(best, "name + relationship no.", 0.97)
     same = [r[2].name for r in rows if abs(r[0] - ratio) <= SAME_NAME]
     if len(same) > 1:
-        return {
-            "id": best.id,
-            "name": best.name,
-            "match": "name (several vendors)",
-            "confidence": 0.5,
-            "same_name": same[:10],
-        }
-    return {
-        "id": best.id,
-        "name": best.name,
-        "match": "name",
-        "confidence": round(min(0.95, ratio), 2),
-    }
+        return result(best, "name (several vendors)", 0.5, same)
+    return result(best, "name", round(min(0.95, ratio), 2))
+
+
+def _unique(partners: list[Partner]) -> list[Partner]:
+    seen: set[int] = set()
+    out = []
+    for p in partners:
+        if p.id not in seen:
+            seen.add(p.id)
+            out.append(p)
+    return out[:MAX_SUGGESTIONS]
+
+
+def _bill_first_word(normalised: str) -> str | None:
+    m = re.match(r"([a-z]{3,})\b", normalised)
+    return m.group(1) if m and m.group(1) not in GENERIC | NOT_A_NAME else None
+
+
+def _vendor_first_word(name: str) -> str | None:
+    m = re.match(r"\W*([a-z]{3,})\b", extras.split_relationship(name)[0].lower())
+    return m.group(1) if m and m.group(1) not in GENERIC | NOT_A_NAME else None
