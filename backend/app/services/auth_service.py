@@ -51,6 +51,22 @@ def _new_session(db: Session, user: User) -> tuple[AuthSession, str]:
     return session, refresh
 
 
+def _wrong_credentials() -> AppError:
+    """The one answer for an unknown user, a wrong password, or a locked account with a wrong
+    password. It carries only the lockout policy, which is the same for everyone."""
+    return AppError(
+        401,
+        "INVALID_CREDENTIALS",
+        "Wrong username or password",
+        [
+            {
+                "max_attempts": settings.LOGIN_MAX_FAILED_ATTEMPTS,
+                "lockout_minutes": settings.LOGIN_LOCKOUT_MINUTES,
+            }
+        ],
+    )
+
+
 def login(db: Session, username: str, password: str) -> dict:
     ctx = get_request_context()
     if not limiter.hit(f"login-ip:{ctx.ip_address}", settings.LOGIN_RATE_LIMIT_PER_MINUTE):
@@ -76,14 +92,32 @@ def login(db: Session, username: str, password: str) -> dict:
             details={"username": username, "reason": "unknown_user"},
         )
         db.commit()
-        raise AppError(401, "INVALID_CREDENTIALS", "Invalid username or password")
+        raise _wrong_credentials()
 
+    # Never say which of the two was wrong, or that an account exists / is locked, until the
+    # password is right: anything else lets an attacker list valid usernames (VAPT finding).
+    password_ok = verify_password(password, user.password_hash)
     if user.locked_until and user.locked_until > now:
-        audit_service.record(db, "LOGIN_BLOCKED_LOCKED", "user", user.id, actor=user)
+        audit_service.record(
+            db,
+            "LOGIN_BLOCKED_LOCKED",
+            "user",
+            user.id,
+            actor=user,
+            details={"password_ok": password_ok},
+        )
         db.commit()
-        raise AppError(423, "ACCOUNT_LOCKED", "Account is locked; try again later")
+        if not password_ok:
+            raise _wrong_credentials()
+        raise AppError(
+            423,
+            "ACCOUNT_LOCKED",
+            "This account is locked after too many wrong passwords. Try again after the time "
+            "shown, or ask the portal admin to unlock it.",
+            [{"locked_until": user.locked_until.isoformat()}],
+        )
 
-    if not verify_password(password, user.password_hash):
+    if not password_ok:
         user.failed_login_count += 1
         details = {"failed_count": user.failed_login_count}
         audit_service.record(db, "LOGIN_FAILED", "user", user.id, actor=user, details=details)
@@ -99,12 +133,17 @@ def login(db: Session, username: str, password: str) -> dict:
                 details={"locked_until": user.locked_until.isoformat()},
             )
         db.commit()
-        raise AppError(401, "INVALID_CREDENTIALS", "Invalid username or password")
+        raise _wrong_credentials()
 
     if not user.is_active or not user.employee_active:
+        # The password was right, so saying why is safe and saves a helpdesk call.
         audit_service.record(db, "LOGIN_BLOCKED_INACTIVE", "user", user.id, actor=user)
         db.commit()
-        raise AppError(401, "INVALID_CREDENTIALS", "Invalid username or password")
+        raise AppError(
+            403,
+            "ACCOUNT_INACTIVE",
+            "This account is switched off. Ask the portal admin to turn it back on.",
+        )
 
     user.failed_login_count = 0
     user.locked_until = None

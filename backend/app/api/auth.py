@@ -24,10 +24,15 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
     "/login",
     response_model=TokenResponse,
     summary="Log in",
-    description="Returns a short-lived access token and a rotating refresh token. Five failed "
-    "attempts lock the account for a configurable period. Rate-limited per IP.",
+    description="Returns a short-lived access token and a rotating refresh token. "
+    "LOGIN_MAX_FAILED_ATTEMPTS wrong passwords in a row lock the account for "
+    "LOGIN_LOCKOUT_MINUTES. Rate-limited per IP. An unknown user, a wrong password and a locked "
+    "account with a wrong password all get the same 401 INVALID_CREDENTIALS (no username "
+    "enumeration); only with the right password does the answer say the account is locked "
+    "(423, errors[0].locked_until) or switched off (403 ACCOUNT_INACTIVE).",
     responses={
         401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         423: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
     },

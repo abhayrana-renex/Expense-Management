@@ -19,6 +19,22 @@ def test_login_failure_and_lockout(api):
     api.login("user2")
 
 
+def test_locked_account_with_wrong_password_looks_like_any_wrong_login(api):
+    """No username enumeration: 'locked' is only said once the password is right."""
+    for _ in range(5):
+        api.c.post("/api/auth/login", json={"username": "user2", "password": "wrong"})
+    locked_wrong = api.c.post("/api/auth/login", json={"username": "user2", "password": "wrong"})
+    unknown = api.c.post("/api/auth/login", json={"username": "nobody", "password": "wrong"})
+    assert locked_wrong.status_code == unknown.status_code == 401
+    assert locked_wrong.json()["detail"] == unknown.json()["detail"]
+    assert locked_wrong.json()["errors"] == unknown.json()["errors"]  # the lockout policy only
+    locked_right = api.c.post("/api/auth/login", json={"username": "user2", "password": DEMO_PW})
+    assert locked_right.status_code == 423 and locked_right.json()["errors"][0]["locked_until"]
+    me = api.get("admin", "/api/users", params={"q": "user2"}).json()[0]
+    api.post("admin", f"/api/users/{me['id']}/unlock")
+    api.login("user2")
+
+
 def test_unknown_user_same_error(api):
     r = api.c.post("/api/auth/login", json={"username": "nobody", "password": "x"})
     assert r.status_code == 401

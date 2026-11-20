@@ -6826,7 +6826,7 @@
     },
     "/api/auth/login": {
       "post": {
-        "description": "Returns a short-lived access token and a rotating refresh token. Five failed attempts lock the account for a configurable period. Rate-limited per IP.",
+        "description": "Returns a short-lived access token and a rotating refresh token. LOGIN_MAX_FAILED_ATTEMPTS wrong passwords in a row lock the account for LOGIN_LOCKOUT_MINUTES. Rate-limited per IP. An unknown user, a wrong password and a locked account with a wrong password all get the same 401 INVALID_CREDENTIALS (no username enumeration); only with the right password does the answer say the account is locked (423, errors[0].locked_until) or switched off (403 ACCOUNT_INACTIVE).",
         "operationId": "login_api_auth_login_post",
         "requestBody": {
           "content": {
@@ -6858,6 +6858,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "422": {
             "content": {
