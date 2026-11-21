@@ -172,7 +172,7 @@ function Preview({ doc }: { doc?: Line["docs"][number] }) {
 type TaxKind = "cgst" | "sgst" | "igst";
 const PAIR: Record<TaxKind, TaxKind | null> = { cgst: "sgst", sgst: "cgst", igst: null };
 
-/** Changing the pre-tax amount recalculates every tax that has a rate chosen. */
+/** Changing the taxable amount recalculates every tax that has a rate chosen. */
 function withTaxable(line: Line, taxable: string): Partial<Line> {
   const patch: Partial<Line> = { taxable_amount: taxable };
   for (const k of ["cgst", "sgst", "igst"] as const) {
@@ -390,7 +390,7 @@ export function BillLine({ line, index, vendors, rates, canRemove, onChange, onR
         {extra}
       </div>
       <div className="tax-grid">
-        <LField line={line} name="taxable_amount" label="Amount (pre-tax)">
+        <LField line={line} name="taxable_amount" label="Taxable amount">
           <input className="input num" inputMode="decimal" placeholder="0.00"
             value={line.taxable_amount}
             aria-invalid={line.taxable_amount !== "" && !MONEY_RE.test(line.taxable_amount)}
@@ -401,7 +401,7 @@ export function BillLine({ line, index, vendors, rates, canRemove, onChange, onR
           <TaxCell key={kind} kind={kind} line={line} rates={rates} onChange={onChange}
             withRate={showRates} />
         ))}
-        <div className="total-box"><div className="label">Line total</div>
+        <div className="total-box"><div className="label">Total</div>
           <div className="value">{inr(total)}</div>
           {line.fields?.total_amount && String(line.fields.total_amount.value) !== total && (
             <div className="small" style={{ color: "var(--amber-600)" }}>

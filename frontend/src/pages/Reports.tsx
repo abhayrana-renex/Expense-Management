@@ -56,7 +56,7 @@ export function Reports() {
       <div className="grid grid-4" style={{ marginBottom: 12 }}>
         <div className="card kpi"><div className="kpi-label">Expenses</div>
           <div className="kpi-value">{t?.count ?? "—"}</div></div>
-        <div className="card kpi"><div className="kpi-label">Pre-tax</div>
+        <div className="card kpi"><div className="kpi-label">Taxable amount</div>
           <div className="kpi-value">{inr(t?.total_taxable, { compact: true })}</div></div>
         <div className="card kpi"><div className="kpi-label">GST</div>
           <div className="kpi-value">{inr(t?.total_tax, { compact: true })}</div></div>

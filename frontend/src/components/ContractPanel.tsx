@@ -97,7 +97,7 @@ export function ContractPanel({ details, setD, extra, setExtra, contract, setCon
             <span className="muted"> · {contract.party_name}</span>
             <div className="small muted">
               {date(contract.start_date)} – {date(contract.end_date)} · {FREQUENCY_LABEL[contract.frequency]}
-              {contract.period_amount && <> · {inr(contract.period_amount)} each (pre-tax)</>}
+              {contract.period_amount && <> · {inr(contract.period_amount)} each (taxable amount)</>}
               {contract.gst_rate && <> · GST {Number(contract.gst_rate)}%</>}
             </div>
           </div>
@@ -234,7 +234,7 @@ export function ContractPanel({ details, setD, extra, setExtra, contract, setCon
               onChange={(e) => setExtra({ frequency: e.target.value as ContractFrequency })}>
               {Object.entries(FREQUENCY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select></Field>
-          <Field label="Amount each payment" hint="Pre-tax">
+          <Field label="Amount each payment" hint="Taxable amount">
             <input className="input num" inputMode="decimal" placeholder="0.00" value={extra.period_amount}
               onChange={(e) => setExtra({ period_amount: e.target.value })} /></Field>
           <Field label="GST %" hint="Optional">
