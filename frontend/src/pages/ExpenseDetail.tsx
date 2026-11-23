@@ -12,6 +12,7 @@ import type {
 } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { BillTypeInfo } from "../components/BillType";
+import { Discussion } from "../components/Discussion";
 import { Tracker } from "../components/Tracker";
 import { Avatar, ErrorAlert, Field, Modal, PageHead, Skeleton, StatusPill,
   useToast } from "../components/ui";
@@ -316,6 +317,8 @@ export function ExpenseDetail() {
 
           {e.purpose && <div className="card"><div className="card-head"><h3>Business purpose</h3>
           </div><div className="card-body" style={{ whiteSpace: "pre-wrap" }}>{e.purpose}</div></div>}
+
+          <Discussion expenseId={e.id} />
         </div>
 
         <div style={{ display: "grid", gap: 12 }}>

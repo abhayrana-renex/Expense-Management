@@ -9,6 +9,7 @@ from app.api import (
     auth,
     bills,
     contracts,
+    discussion,
     engagement,
     expenses,
     masters,
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
         bills,
         contracts,
         engagement,
+        discussion,  # before expenses: /expenses/{id}/messages is not a workflow action
         expenses,
         reports,
         system,

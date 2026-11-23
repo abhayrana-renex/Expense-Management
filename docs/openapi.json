@@ -736,6 +736,30 @@
         "title": "BillReadResult",
         "type": "object"
       },
+      "Body_post_message_api_expenses__expense_id__messages_post": {
+        "properties": {
+          "body": {
+            "default": "",
+            "title": "Body",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "format": "binary",
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "mentions": {
+            "default": "",
+            "title": "Mentions",
+            "type": "string"
+          }
+        },
+        "title": "Body_post_message_api_expenses__expense_id__messages_post",
+        "type": "object"
+      },
       "Body_read_bill_api_bills_read_post": {
         "properties": {
           "file": {
@@ -1589,10 +1613,10 @@
       "DelegationOut": {
         "properties": {
           "approver": {
-            "$ref": "#/components/schemas/Person"
+            "$ref": "#/components/schemas/app__api__engagement__Person"
           },
           "delegate": {
-            "$ref": "#/components/schemas/Person"
+            "$ref": "#/components/schemas/app__api__engagement__Person"
           },
           "ends_on": {
             "format": "date",
@@ -4608,6 +4632,78 @@
         "title": "Message",
         "type": "object"
       },
+      "MessageFile": {
+        "properties": {
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "content_type",
+          "size_bytes"
+        ],
+        "title": "MessageFile",
+        "type": "object"
+      },
+      "MessageOut": {
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/app__api__discussion__Person"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/MessageFile"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "mentions": {
+            "items": {
+              "$ref": "#/components/schemas/app__api__discussion__Person"
+            },
+            "title": "Mentions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "body",
+          "created_at",
+          "mentions",
+          "files"
+        ],
+        "title": "MessageOut",
+        "type": "object"
+      },
       "NotificationOut": {
         "properties": {
           "body": {
@@ -4887,24 +4983,6 @@
           "scopes"
         ],
         "title": "PermissionOut",
-        "type": "object"
-      },
-      "Person": {
-        "properties": {
-          "full_name": {
-            "title": "Full Name",
-            "type": "string"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "full_name"
-        ],
-        "title": "Person",
         "type": "object"
       },
       "Ref": {
@@ -5327,6 +5405,35 @@
           "comment"
         ],
         "title": "StepOut",
+        "type": "object"
+      },
+      "ThreadOut": {
+        "properties": {
+          "can_post": {
+            "title": "Can Post",
+            "type": "boolean"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageOut"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/app__api__discussion__Person"
+            },
+            "title": "Participants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "can_post",
+          "participants",
+          "messages"
+        ],
+        "title": "ThreadOut",
         "type": "object"
       },
       "TokenResponse": {
@@ -6381,6 +6488,47 @@
           }
         },
         "title": "VendorUpdate",
+        "type": "object"
+      },
+      "app__api__discussion__Person": {
+        "properties": {
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "full_name",
+          "role"
+        ],
+        "title": "Person",
+        "type": "object"
+      },
+      "app__api__engagement__Person": {
+        "properties": {
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "full_name"
+        ],
+        "title": "Person",
         "type": "object"
       },
       "app__api__roles__RoleOut": {
@@ -8017,7 +8165,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Person"
+                    "$ref": "#/components/schemas/app__api__engagement__Person"
                   },
                   "title": "Response Delegate Candidates Api Delegations Candidates Get",
                   "type": "array"
@@ -9307,6 +9455,223 @@
         "tags": [
           "Expenses",
           "Documents"
+        ]
+      }
+    },
+    "/api/expenses/{expense_id}/messages": {
+      "get": {
+        "description": "Only the people in the expense's process (initiator, approvers on its route, anyone acting for them) and the audit team (read only). Everyone else: 404.",
+        "operationId": "get_thread_api_expenses__expense_id__messages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expense_id",
+            "required": true,
+            "schema": {
+              "title": "Expense Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Discussion on this expense",
+        "tags": [
+          "Discussion"
+        ]
+      },
+      "post": {
+        "description": "Multipart: `body`, `mentions` (comma-separated user ids - only people in the process), up to 5 `files` (PDF, JPG or PNG, max 10 MB each). Messages are permanent; each mention is notified.",
+        "operationId": "post_message_api_expenses__expense_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expense_id",
+            "required": true,
+            "schema": {
+              "title": "Expense Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_post_message_api_expenses__expense_id__messages_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ask a question or reply",
+        "tags": [
+          "Discussion"
+        ]
+      }
+    },
+    "/api/expenses/{expense_id}/messages/files/{file_id}": {
+      "get": {
+        "operationId": "download_file_api_expenses__expense_id__messages_files__file_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expense_id",
+            "required": true,
+            "schema": {
+              "title": "Expense Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "file_id",
+            "required": true,
+            "schema": {
+              "title": "File Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Download a file attached to the discussion",
+        "tags": [
+          "Discussion"
         ]
       }
     },

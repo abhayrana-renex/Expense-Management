@@ -116,6 +116,10 @@ export const api = {
     fd.append("file", file);
     return (await raw(path, { method: "POST", body: fd })).json();
   },
+  /** POST multipart form data (fields and files). */
+  async postForm<T>(path: string, form: FormData): Promise<T> {
+    return (await raw(path, { method: "POST", body: form })).json();
+  },
   /** Download an authenticated file (export) and save it. */
   async download(path: string, params?: Query, body?: unknown): Promise<void> {
     const res = await raw(path + qs(params), body === undefined ? undefined

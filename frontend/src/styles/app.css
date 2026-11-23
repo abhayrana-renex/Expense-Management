@@ -755,3 +755,42 @@ kbd { font-family: inherit; font-size: 10px; font-weight: 600; color: var(--ink-
 .send-to-opt.on { border-color: var(--brand-600); background: var(--brand-50); }
 .send-to-opt input { grid-row: span 2; margin: 0; }
 .send-to-name { font-weight: 600; font-size: var(--fs-sm); }
+
+/* Discussion on an expense (WhatsApp-style questions and replies) */
+.chat { display: grid; gap: 12px; }
+.chat-empty { display: flex; align-items: center; gap: 8px; }
+.chat-list { display: grid; gap: 10px; max-height: 420px; overflow-y: auto; }
+.chat-list:empty { display: none; }
+.chat-msg { display: flex; align-items: flex-end; gap: 8px; max-width: 85%; }
+.chat-msg.mine { margin-left: auto; flex-direction: row-reverse; }
+.chat-bubble { min-width: 0; padding: 8px 11px; border: 1px solid var(--line);
+  border-radius: var(--r-md); background: #fff; }
+.chat-msg.mine .chat-bubble { background: var(--brand-50); border-color: var(--brand-100); }
+.chat-meta { font-size: var(--fs-xs, 12px); margin-bottom: 2px; }
+.chat-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-sm); }
+.chat-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.mention { color: var(--brand-700); background: var(--brand-50); border-radius: 4px; padding: 0 3px;
+  font-weight: 600; }
+.chat-msg.mine .mention { background: #fff; }
+.chat-compose { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.chat-input-wrap { position: relative; }
+.chat-input-wrap .textarea { width: 100%; min-height: 60px; }
+.mention-menu { position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 20; min-width: 260px;
+  max-width: 100%; background: #fff; border: 1px solid var(--line); border-radius: var(--r-md);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12); padding: 4px; display: grid; }
+.mention-opt { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 8px;
+  border: 0; background: transparent; text-align: left; padding: 6px 8px; border-radius: 6px;
+  cursor: pointer; font: inherit; color: var(--ink-900); }
+.mention-opt.on, .mention-opt:hover { background: var(--brand-50); }
+.mention-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 600px) { .chat-msg { max-width: 100%; } }
+
+/* Phone: the page header stacks - title (expense number kept on one line) above its buttons,
+   which wrap instead of running off the screen. */
+@media (max-width: 600px) {
+  .page-head { flex-wrap: wrap; align-items: flex-start; }
+  .page-head > div:first-child { min-width: 0; flex: 1 1 100%; }
+  .page-head h1 .row { flex-wrap: wrap; }
+  .page-head h1 { white-space: nowrap; }
+  .page-head .actions { margin-left: 0; flex-wrap: wrap; width: 100%; }
+}

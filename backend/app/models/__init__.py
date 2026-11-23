@@ -3,6 +3,7 @@
 from app.models.audit import AuditLog, IdempotencyRecord
 from app.models.base import Base
 from app.models.contract import Contract
+from app.models.discussion import ExpenseMessage, ExpenseMessageFile
 from app.models.engagement import Delegation, Notification
 from app.models.expense import (
     ApprovalStep,
@@ -49,6 +50,8 @@ __all__ = [
     "ExpenseDocument",
     "ExpenseHistory",
     "ExpenseItem",
+    "ExpenseMessage",
+    "ExpenseMessageFile",
     "ExpenseType",
     "GstRate",
     "IdempotencyRecord",
