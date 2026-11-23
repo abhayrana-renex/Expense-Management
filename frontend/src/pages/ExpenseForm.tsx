@@ -2,7 +2,7 @@ import { Select } from "../components/Select";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ChevronRight, History, Plus, Send } from "lucide-react";
+import { ChevronRight, History, Send } from "lucide-react";
 import { api, ApiError } from "../api/client";
 import type {
   BillRead, BillType, Contract, ContractPeriod, EmailRead, Expense, GstRate, RouteStepPreview,
@@ -753,15 +753,9 @@ export function ExpenseForm() {
           </div>
         )}
 
-        {showLines && (
+        {showLines && hasBills && (
           <div className="card add-more"><div className="card-body">
-            <div className="row" style={{ alignItems: "stretch" }}>
-              {hasBills && (
-                <div style={{ flex: 1 }}><BillDropzone compact onFiles={readBills} /></div>)}
-              <button className="btn" style={{ height: "auto", minHeight: 30 }}
-                onClick={() => setLines((ls) => [...ls, blankLine()])}>
-                <Plus size={15} />Line without bill</button>
-            </div>
+            <BillDropzone compact onFiles={readBills} />
           </div></div>
         )}
       </div>
