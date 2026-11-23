@@ -44,10 +44,7 @@ TRANSITIONS: dict[str, Transition] = {
     "send_back": Transition(
         "PENDING",
         "current_approver",
-        "One step back: to the previous approver, or RETURNED to the owner from the first level",
-    ),
-    "correct": Transition(
-        "PENDING", "verifier", "Finance check corrects bill details (amounts, GST, invoice)"
+        "Back to the initiator (RETURNED, to rewrite the bill) or to any earlier approver",
     ),
     "reopen": Transition("REJECTED", "permission:expense.reopen", "REJECTED -> RETURNED (admin)"),
 }
@@ -72,10 +69,6 @@ def _actor_ok(spec: str, expense: Expense, principal: Principal) -> bool:
             expense.current_approver_id in principal.acting_for
         )
         return mine and expense.owner_id != uid and principal.can("expense.approve")
-    if spec == "verifier":
-        return _actor_ok("current_approver", expense, principal) and principal.can(
-            "expense.correct"
-        )
     if spec.startswith("permission:"):
         return principal.can(spec.split(":", 1)[1])
     return False

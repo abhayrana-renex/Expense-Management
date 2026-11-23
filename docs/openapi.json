@@ -9,6 +9,19 @@
             "title": "Comment",
             "type": "string"
           },
+          "to": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "send_back only: \"owner\" (initiator rewrites the bill) or an earlier approver's step id from allowed-actions send_back_targets. Left out: one step back.",
+            "title": "To"
+          },
           "version": {
             "anyOf": [
               {
@@ -36,12 +49,6 @@
           },
           "cancel": {
             "title": "Cancel",
-            "type": "boolean"
-          },
-          "correct": {
-            "default": false,
-            "description": "Finance check may correct bill details now",
-            "title": "Correct",
             "type": "boolean"
           },
           "edit": {
@@ -79,6 +86,14 @@
             "title": "Send Back",
             "type": "boolean"
           },
+          "send_back_targets": {
+            "description": "Everyone you may send it back to: the initiator and earlier approvers",
+            "items": {
+              "$ref": "#/components/schemas/SendBackTarget"
+            },
+            "title": "Send Back Targets",
+            "type": "array"
+          },
           "send_back_to": {
             "anyOf": [
               {
@@ -88,7 +103,7 @@
                 "type": "null"
               }
             ],
-            "description": "Who a send-back would go to (previous approver, or the employee)",
+            "description": "Who a send-back with no target goes to (previous approver, or the initiator)",
             "title": "Send Back To"
           },
           "submit": {
@@ -1414,236 +1429,6 @@
         "title": "ContractSchedule",
         "type": "object"
       },
-      "CorrectionItemIn": {
-        "properties": {
-          "bill_date": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bill Date"
-          },
-          "bill_number": {
-            "anyOf": [
-              {
-                "maxLength": 60,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bill Number"
-          },
-          "cgst_amount": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "default": "0.00",
-            "example": "1250.00",
-            "pattern": "^-?\\d+\\.\\d{2}$",
-            "title": "Cgst Amount",
-            "type": "string"
-          },
-          "cgst_rate": {
-            "anyOf": [
-              {
-                "maximum": 100.0,
-                "minimum": 0.0,
-                "type": "number"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cgst Rate"
-          },
-          "description": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Description",
-            "type": "string"
-          },
-          "id": {
-            "description": "Existing line to correct",
-            "title": "Id",
-            "type": "integer"
-          },
-          "igst_amount": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "default": "0.00",
-            "example": "1250.00",
-            "pattern": "^-?\\d+\\.\\d{2}$",
-            "title": "Igst Amount",
-            "type": "string"
-          },
-          "igst_rate": {
-            "anyOf": [
-              {
-                "maximum": 100.0,
-                "minimum": 0.0,
-                "type": "number"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Igst Rate"
-          },
-          "sgst_amount": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "default": "0.00",
-            "example": "1250.00",
-            "pattern": "^-?\\d+\\.\\d{2}$",
-            "title": "Sgst Amount",
-            "type": "string"
-          },
-          "sgst_rate": {
-            "anyOf": [
-              {
-                "maximum": 100.0,
-                "minimum": 0.0,
-                "type": "number"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sgst Rate"
-          },
-          "supplier_gstin": {
-            "anyOf": [
-              {
-                "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Supplier Gstin"
-          },
-          "supplier_msme": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Supplier Msme"
-          },
-          "supplier_name": {
-            "anyOf": [
-              {
-                "maxLength": 200,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Supplier Name"
-          },
-          "taxable_amount": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "example": "1250.00",
-            "pattern": "^-?\\d+\\.\\d{2}$",
-            "title": "Taxable Amount",
-            "type": "string"
-          },
-          "vendor_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Vendor Id"
-          }
-        },
-        "required": [
-          "id",
-          "description",
-          "taxable_amount"
-        ],
-        "title": "CorrectionItemIn",
-        "type": "object"
-      },
-      "CorrectionRequest": {
-        "properties": {
-          "comment": {
-            "description": "What was corrected and why",
-            "maxLength": 2000,
-            "minLength": 3,
-            "title": "Comment",
-            "type": "string"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/CorrectionItemIn"
-            },
-            "maxItems": 100,
-            "minItems": 1,
-            "title": "Items",
-            "type": "array"
-          },
-          "version": {
-            "title": "Version",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "items",
-          "comment",
-          "version"
-        ],
-        "title": "CorrectionRequest",
-        "type": "object"
-      },
       "CostCentreIn": {
         "properties": {
           "code": {
@@ -2658,17 +2443,20 @@
             "type": "boolean"
           },
           "title": {
-            "examples": [
-              "Client visit - Pune"
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Title",
-            "type": "string"
+            "description": "Optional. Claims are known by their expense number; when left out the server keeps a short label (vendor - month) for search and the ledger narration.",
+            "title": "Title"
           }
         },
         "required": [
-          "title",
           "expense_type_id",
           "items"
         ],
@@ -4367,13 +4155,17 @@
             "title": "Purpose"
           },
           "title": {
-            "examples": [
-              "Client visit - Pune"
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Title",
-            "type": "string"
+            "description": "Optional. Claims are known by their expense number; when left out the server keeps a short label (vendor - month) for search and the ledger narration.",
+            "title": "Title"
           },
           "version": {
             "description": "Version you loaded; mismatch returns 409",
@@ -4382,7 +4174,6 @@
           }
         },
         "required": [
-          "title",
           "expense_type_id",
           "items",
           "version"
@@ -5384,6 +5175,43 @@
           "approval_limit"
         ],
         "title": "RouteStepPreview",
+        "type": "object"
+      },
+      "SendBackTarget": {
+        "properties": {
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Approval level code; null for the initiator",
+            "title": "Level"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "to": {
+            "description": "\"owner\" or an approval step id",
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to",
+          "name",
+          "level",
+          "role"
+        ],
+        "title": "SendBackTarget",
         "type": "object"
       },
       "SignedUrlOut": {
@@ -9226,94 +9054,6 @@
         ]
       }
     },
-    "/api/expenses/{expense_id}/correction": {
-      "put": {
-        "description": "Only the current approver holding `expense.correct` (F&A ratification), while the claim is with them. Every changed value is audited old -> new, totals are recalculated, and later levels are re-planned (e.g. MD added or skipped when the total crosses the limit). The employee is notified.",
-        "operationId": "correct_expense_api_expenses__expense_id__correction_put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "expense_id",
-            "required": true,
-            "schema": {
-              "title": "Expense Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CorrectionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExpenseOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not authenticated"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden or password change required"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "INVALID_TRANSITION or CONCURRENT_MODIFICATION"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Finance check: correct bill details",
-        "tags": [
-          "Expenses"
-        ]
-      }
-    },
     "/api/expenses/{expense_id}/documents/{document_id}": {
       "delete": {
         "operationId": "supersede_document_api_expenses__expense_id__documents__document_id__delete",
@@ -9977,7 +9717,7 @@
     },
     "/api/expenses/{expense_id}/{action}": {
       "post": {
-        "description": "approve / send_back / reject / return (current approver), cancel (owner, before final approval), reopen (ADMIN, REJECTED -> RETURNED). send_back pushes the claim one step back: to the previous approver, or to the employee from the first level - it never cancels. A comment is mandatory. Supports Idempotency-Key.",
+        "description": "approve / send_back / reject / return (current approver), cancel (owner, before final approval), reopen (ADMIN, REJECTED -> RETURNED). send_back never cancels: `to` = \"owner\" sends it to the initiator to rewrite the bill (it is routed from the first approver again on resubmit); `to` = a step id from allowed-actions `send_back_targets` sends it to that earlier approver with a question; left out = one step back. Only the initiator ever edits the bill. A comment is mandatory. Supports Idempotency-Key.",
         "operationId": "workflow_action_api_expenses__expense_id___action__post",
         "parameters": [
           {

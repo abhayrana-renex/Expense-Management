@@ -745,3 +745,13 @@ kbd { font-family: inherit; font-size: 10px; font-weight: 600; color: var(--ink-
   cursor: pointer; font: inherit; color: var(--brand-600); }
 .contract-result:hover { border-color: var(--brand-500); background: var(--brand-50); }
 .contract-result .pill { flex: none; }
+
+/* Send back: pick who it goes to (initiator or an earlier approver) */
+.send-to { display: grid; gap: 6px; }
+.send-to-opt { display: grid; grid-template-columns: 16px 1fr; column-gap: 10px; row-gap: 2px;
+  align-items: center; padding: 8px 10px; border: 1.5px solid var(--line); border-radius: var(--r-md);
+  cursor: pointer; }
+.send-to-opt:hover { border-color: var(--brand-500); }
+.send-to-opt.on { border-color: var(--brand-600); background: var(--brand-50); }
+.send-to-opt input { grid-row: span 2; margin: 0; }
+.send-to-name { font-weight: 600; font-size: var(--fs-sm); }

@@ -64,7 +64,12 @@ class ExpenseItemIn(BaseModel):
 
 
 class ExpenseIn(BaseModel):
-    title: str = Field(min_length=1, max_length=200, examples=["Client visit - Pune"])
+    title: str | None = Field(
+        None,
+        max_length=200,
+        description="Optional. Claims are known by their expense number; when left out the "
+        "server keeps a short label (vendor - month) for search and the ledger narration.",
+    )
     purpose: str | None = Field(None, max_length=2000)
     expense_type_id: int
     branch_id: int | None = Field(None, description="Defaults to the user's home branch")
@@ -253,6 +258,19 @@ class ExpenseOut(ExpenseSummaryOut):
 class ActionRequest(BaseModel):
     comment: str = Field(min_length=3, max_length=2000)
     version: int | None = Field(None, description="Optional optimistic-lock check")
+    to: str | None = Field(
+        None,
+        max_length=20,
+        description="send_back only: \"owner\" (initiator rewrites the bill) or an earlier "
+        "approver's step id from allowed-actions send_back_targets. Left out: one step back.",
+    )
+
+
+class SendBackTarget(BaseModel):
+    to: str = Field(description="\"owner\" or an approval step id")
+    name: str
+    level: str | None = Field(description="Approval level code; null for the initiator")
+    role: str
 
 
 class ValidationIssue(BaseModel):
@@ -350,9 +368,13 @@ class AllowedActions(BaseModel):
     return_: bool = Field(alias="return", serialization_alias="return")
     reopen: bool
     send_back: bool = False
-    correct: bool = Field(False, description="Finance check may correct bill details now")
     send_back_to: str | None = Field(
-        None, description="Who a send-back would go to (previous approver, or the employee)"
+        None, description="Who a send-back with no target goes to (previous approver, or the "
+        "initiator)"
+    )
+    send_back_targets: list[SendBackTarget] = Field(
+        default_factory=list,
+        description="Everyone you may send it back to: the initiator and earlier approvers",
     )
     record_payment: bool = Field(False, description="Any payment step is available to you")
     payment_actions: list[str] = Field(
@@ -389,45 +411,6 @@ class StepOut(ORMModel):
 class SignedUrlOut(BaseModel):
     url: str
     expires_at: datetime
-
-
-class CorrectionItemIn(BaseModel):
-    id: int = Field(description="Existing line to correct")
-    description: str = Field(min_length=1, max_length=500)
-    vendor_id: int | None = None
-    bill_number: str | None = Field(None, max_length=60)
-    bill_date: date | None = None
-    taxable_amount: Money
-    cgst_amount: Money = Decimal("0.00")
-    sgst_amount: Money = Decimal("0.00")
-    igst_amount: Money = Decimal("0.00")
-    cgst_rate: Decimal | None = Field(None, ge=0, le=100, decimal_places=2)
-    sgst_rate: Decimal | None = Field(None, ge=0, le=100, decimal_places=2)
-    igst_rate: Decimal | None = Field(None, ge=0, le=100, decimal_places=2)
-    supplier_name: str | None = Field(None, max_length=200)
-    supplier_gstin: str | None = Field(
-        None, pattern=r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$"
-    )
-    supplier_msme: bool | None = None
-
-    @field_validator("supplier_gstin", mode="before")
-    @classmethod
-    def upper_gstin(cls, v: object) -> object:
-        return v.strip().upper() or None if isinstance(v, str) else v
-
-    @model_validator(mode="after")
-    def check(self) -> "CorrectionItemIn":
-        if self.taxable_amount <= 0:
-            raise ValueError("taxable_amount must be greater than 0")
-        if min(self.cgst_amount, self.sgst_amount, self.igst_amount) < 0:
-            raise ValueError("tax amounts cannot be negative")
-        return self
-
-
-class CorrectionRequest(BaseModel):
-    items: list[CorrectionItemIn] = Field(min_length=1, max_length=100)
-    comment: str = Field(min_length=3, max_length=2000, description="What was corrected and why")
-    version: int
 
 
 class InvoiceMatch(BaseModel):

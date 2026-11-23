@@ -59,7 +59,7 @@ export function CommandPalette() {
       .filter((p) => !needle || `${p.label} ${p.words}`.toLowerCase().includes(needle))
       .map((p) => ({ key: p.to, label: p.label, to: p.to, kind: "page" as const }));
     const exps = (expenses.data ?? []).map((e) => ({
-      key: `e${e.id}`, label: `${e.expense_no} · ${e.title}`, kind: "expense" as const,
+      key: `e${e.id}`, label: `${e.expense_no} · ${e.owner.full_name}`, kind: "expense" as const,
       hint: `${inr(e.total_amount)} · ${statusLabel(e.status, e.payment_status)}`,
       to: `/expenses/${e.id}`,
     }));

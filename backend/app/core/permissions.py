@@ -14,11 +14,6 @@ PERMISSIONS: dict[str, tuple[str, str, tuple[str, ...]]] = {
         "Approvals",
         ("ASSIGNED",),
     ),
-    "expense.correct": (
-        "Correct bill details while it is with them (Finance check)",
-        "Approvals",
-        ("ASSIGNED",),
-    ),
     "expense.reopen": ("Reopen a rejected expense", "Approvals", ("ALL",)),
     "payment.schedule": (
         "Schedule approved claims for payment (payment schedule)",
@@ -37,6 +32,11 @@ PERMISSIONS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     ),
     "ledger.export": ("Download the general ledger", "Payments", ("ALL",)),
     "report.read": ("Run reports", "Reports", ALL_SCOPES),
+    "report.department_spend": (
+        "See spend by department on Home (Finance, F&A check, MD)",
+        "Reports",
+        ("ALL",),
+    ),
     "report.export": ("Export reports to Excel / CSV", "Reports", ("OWN", "DEPARTMENT", "ALL")),
     "report.dump": ("Export the line-level admin dump", "Reports", ("ALL",)),
     "master.read": ("See master data (dropdowns)", "Masters", ("ALL",)),

@@ -68,7 +68,7 @@ export function Expenses() {
           </Select>
         </div>
         <div className="filters">
-          <input className="input" placeholder="Search title or number" defaultValue={q}
+          <input className="input" placeholder="Search expense no. or vendor" defaultValue={q}
             onKeyDown={(e) => e.key === "Enter" && set("q", e.currentTarget.value)} />
           <Select className="select" value={typeId} onChange={(e) => { setTypeId(e.target.value);
             setPage(1); }} aria-label="Expense type">
@@ -94,13 +94,12 @@ export function Expenses() {
               <tbody>
                 {list.data!.rows.map((e) => (
                   <tr key={e.id} className="clickable" onClick={() => navigate(`/expenses/${e.id}`)}>
-                    <td><div className="cell-main clip" title={e.title}>{e.title}</div>
-                      <div className="cell-sub mono">{e.expense_no}</div></td>
+                    <td><div className="cell-main mono">{e.expense_no}</div></td>
                     {wide && <td>{e.owner.full_name}</td>}
                     <td>{e.expense_type.name}</td>
                     <td className="muted">{date(e.submitted_at ?? e.created_at)}</td>
                     <td><StatusPill status={e.status} payment={e.payment_status} /></td>
-                    <td className="muted">{e.current_approver?.full_name ?? "—"}</td>
+                    <td className="muted">{pendingWith(e)}</td>
                     <td className="num amount">{inr(e.total_amount)}</td>
                   </tr>
                 ))}
@@ -113,4 +112,17 @@ export function Expenses() {
       </div>
     </>
   );
+}
+
+/** "Pending with": the approver it waits for, else where it stands (never a bare dash). */
+function pendingWith(e: ExpenseSummary): string {
+  if (e.current_approver) return e.current_approver.full_name;
+  switch (e.status) {
+    case "APPROVED": return "Approved";
+    case "RETURNED": return `${e.owner.full_name} (to rewrite)`;
+    case "DRAFT": return "Not submitted";
+    case "REJECTED": return "Rejected";
+    case "CANCELLED": return "Cancelled";
+    default: return "—";
+  }
 }

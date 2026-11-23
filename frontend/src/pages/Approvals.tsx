@@ -125,8 +125,7 @@ export function Approvals() {
                 <td><div className="row"><Avatar name={e.owner.full_name} size="sm" />
                   <div><div className="cell-main">{e.owner.full_name}</div>
                     <div className="cell-sub">{e.department.name}</div></div></div></td>
-                <td><div className="cell-main clip" title={e.title}>{e.title}</div>
-                  <div className="cell-sub mono">{e.expense_no}</div></td>
+                <td><div className="cell-main mono">{e.expense_no}</div></td>
                 <td>{e.expense_type.name}</td>
                 <td className="muted">{date(e.submitted_at)}</td>
                 <td><StatusPill status={e.status} /></td>

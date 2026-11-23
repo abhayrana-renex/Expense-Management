@@ -17,6 +17,21 @@ def test_dashboard_for_user_and_approver(api):
     assert admin["series"]["by_category"][0]["amount"].count(".") == 1
 
 
+def test_home_charts_only_for_approvers_and_department_spend_for_finance_md(api):
+    exp = api.new_expense("user1", ["1500.00"], submit=True)
+    api.act("approver1", exp["id"], "approve")
+    user = api.get("user1", "/api/dashboard/summary").json()
+    assert user["show"] == {"spend_charts": False, "department_spend": False}
+    assert not user["series"]["by_month"] and not user["series"]["by_category"]
+    assert not user["series"]["by_department"]
+    appr = api.get("approver1", "/api/dashboard/summary").json()
+    assert appr["show"] == {"spend_charts": True, "department_spend": False}
+    assert appr["series"]["by_month"] and not appr["series"]["by_department"]
+    md = api.get("mdpay", "/api/dashboard/summary").json()
+    assert md["show"] == {"spend_charts": True, "department_spend": True}
+    assert md["series"]["by_department"]
+
+
 def test_expense_type_specific_rule_wins(api):
     ops = api.lookup("finadmin", "departments", "OPERATIONS")
     rent = api.lookup("finadmin", "expense-types", "RENT")

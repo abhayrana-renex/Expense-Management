@@ -1,4 +1,7 @@
-"""Approve / reject / return / cancel / reopen, history and the approver queue."""
+"""Approve / reject / send back / cancel / reopen, history and the approver queue.
+
+Only the initiator edits a bill. Approvers never change it: they send it back - to the
+initiator to rewrite it, or to an earlier approver with a question."""
 
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
@@ -8,16 +11,13 @@ from app.core.context import get_request_context
 from app.core.deps import Principal
 from app.core.errors import AppError
 from app.core.security import utcnow
-from app.models import ApprovalStep, Expense, ExpenseHistory, Partner
+from app.models import ApprovalStep, Expense, ExpenseHistory
 from app.schemas.common import money_str
-from app.schemas.expense import CorrectionRequest
 from app.services import (
     audit_service,
     engagement_service,
     expense_rules,
     idempotency_service,
-    invoice_check,
-    routing_service,
 )
 from app.services.expense_service import get_visible, serialize
 from app.services.idempotency_service import IdempotencyContext
@@ -102,7 +102,10 @@ def act(
     comment: str,
     version: int | None,
     idem: IdempotencyContext | None = None,
+    to: str | None = None,
 ) -> dict:
+    """`to` (send_back only): "owner" = back to the initiator to rewrite the bill; a step id =
+    back to that earlier approver to answer a question. Left out: one step back."""
     expense = _load(db, principal, expense_id, action, version)
     from_status = expense.status
     now = utcnow()
@@ -137,13 +140,15 @@ def act(
                 expense.current_approver_id = None
                 expense.payment_status = "PENDING"  # now queued for finance to pay
             history_action = "APPROVED"
-        elif action == "send_back" and (prev := _previous(steps, step)) is not None:
-            # Push back one step: the previous approver gets it again; nothing is cancelled.
+        elif action == "send_back" and (prev := _send_back_step(steps, step, to)) is not None:
+            # Back to an earlier approver with a question. Everyone from them up to here
+            # approves again afterwards; nothing is cancelled and only the initiator edits.
             sent_to = prev
-            for s_ in (step, prev):
-                s_.acted_by_id = None
-                s_.acted_at = None
-            step.status, step.activated_at, step.comment = "WAITING", None, None
+            for s_ in steps:
+                if prev.sequence <= s_.sequence <= step.sequence:
+                    s_.acted_by_id, s_.acted_at = None, None
+                    if s_ is not prev:
+                        s_.status, s_.activated_at, s_.comment = "WAITING", None, None
             prev.status, prev.activated_at = "PENDING", now
             prev.comment = comment
             prev.note = f"Sent back by {principal.user.full_name}"[:255]
@@ -153,7 +158,7 @@ def act(
             expense.current_stage_since = now
             history_action = "SENT_BACK"
         else:
-            if action == "send_back":  # first approver: back to the employee
+            if action == "send_back":  # to the initiator: rewrite the bill and resubmit
                 action = "return"
             step.status = "REJECTED" if action == "reject" else "RETURNED"
             _close_open_steps(steps)
@@ -200,10 +205,30 @@ def _previous(steps: list[ApprovalStep], step: ApprovalStep) -> ApprovalStep | N
     )
 
 
-def send_back_target(db: Session, expense: Expense) -> str | None:
-    """Who a send-back would reach now: the previous approver, or the employee."""
-    if not expense.status.startswith("PENDING_"):
+def _send_back_step(
+    steps: list[ApprovalStep], step: ApprovalStep, to: str | None
+) -> ApprovalStep | None:
+    """The earlier approver a send-back goes to, or None for the initiator."""
+    if to is None:
+        return _previous(steps, step)
+    if to == "owner":
         return None
+    target = next((s for s in steps if str(s.id) == to), None)
+    if target is None or target.sequence >= step.sequence or target.status != "APPROVED":
+        raise AppError(
+            422,
+            "VALIDATION_ERROR",
+            "Send it back to the initiator or to someone who already approved it",
+            [{"field": "to"}],
+        )
+    return target
+
+
+def send_back_targets(db: Session, expense: Expense) -> list[dict]:
+    """Who the current approver may send the claim back to: the initiator (to rewrite the
+    bill) and everyone who already approved it in this round (to answer a question)."""
+    if not expense.status.startswith("PENDING_"):
+        return []
     steps = list(
         db.execute(
             select(ApprovalStep)
@@ -214,10 +239,30 @@ def send_back_target(db: Session, expense: Expense) -> str | None:
         .scalars()
     )
     current = next((s for s in steps if s.status == "PENDING"), None)
-    prev = _previous(steps, current) if current else None
-    if prev is None:
-        return f"{expense.owner.full_name} (employee)"
-    return f"{prev.approver.full_name} ({prev.level.code})"
+    out = [{"to": "owner", "name": expense.owner.full_name, "level": None, "role": "Initiator"}]
+    if current is None:
+        return out
+    out += [
+        {
+            "to": str(s.id),
+            "name": s.approver.full_name,
+            "level": s.level.code,
+            "role": s.level.name,
+        }
+        for s in steps
+        if s.sequence < current.sequence and s.status == "APPROVED"
+    ]
+    return out
+
+
+def send_back_target(db: Session, expense: Expense) -> str | None:
+    """Who a plain send-back (no target chosen) reaches: the previous approver, else the
+    initiator."""
+    targets = send_back_targets(db, expense)
+    if not targets:
+        return None
+    last = targets[-1]
+    return f"{last['name']} ({last['level'] or 'initiator'})"
 
 
 def _notify_sent_back(
@@ -227,7 +272,7 @@ def _notify_sent_back(
         db,
         [to.approver_id],
         "SENT_BACK",
-        f"Sent back to you: {e.title}",
+        f"Sent back to you with a question: {e.expense_no}",
         f"{by.user.full_name}: {comment}",
         e.id,
     )
@@ -235,7 +280,7 @@ def _notify_sent_back(
         db,
         [e.owner_id],
         "SENT_BACK",
-        f"Sent back to {to.approver.full_name} for a re-check: {e.title}",
+        f"Sent back to {to.approver.full_name} for a re-check: {e.expense_no}",
         comment,
         e.id,
     )
@@ -250,7 +295,7 @@ def _notify(db: Session, e: Expense, action: str, comment: str, was_with: int | 
             db,
             owner,
             "APPROVED",
-            f"Approved: {e.title}",
+            f"Approved: {e.expense_no}",
             f"{engagement_service.tag(e)} · queued for payment",
             e.id,
         )
@@ -258,24 +303,24 @@ def _notify(db: Session, e: Expense, action: str, comment: str, was_with: int | 
             db,
             engagement_service.holders_of(db, "payment.schedule"),
             "READY_TO_PAY",
-            f"Ready to schedule for payment: {e.title}",
+            f"Ready to schedule for payment: {e.expense_no}",
             f"{e.owner.full_name} · {engagement_service.tag(e)}",
             e.id,
         )
     elif action == "reject":
-        engagement_service.notify(db, owner, "REJECTED", f"Rejected: {e.title}", comment, e.id)
+        engagement_service.notify(db, owner, "REJECTED", f"Rejected: {e.expense_no}", comment, e.id)
     elif action == "return":
         engagement_service.notify(
-            db, owner, "RETURNED", f"Returned for changes: {e.title}", comment, e.id
+            db, owner, "RETURNED", f"Sent back to you to rewrite: {e.expense_no}", comment, e.id
         )
     elif action == "reopen":
-        engagement_service.notify(db, owner, "REOPENED", f"Reopened: {e.title}", comment, e.id)
+        engagement_service.notify(db, owner, "REOPENED", f"Reopened: {e.expense_no}", comment, e.id)
     elif action == "cancel" and was_with:
         engagement_service.notify(
             db,
             [was_with],
             "WITHDRAWN",
-            f"Withdrawn: {e.title}",
+            f"Withdrawn: {e.expense_no}",
             f"{e.owner.full_name} cancelled it · {comment}",
             e.id,
         )
@@ -343,150 +388,3 @@ def queue_query(principal: Principal) -> Select:
         Expense.owner_id != principal.user.id,
         Expense.status.like("PENDING\\_%"),
     )
-
-
-CORRECTABLE = (
-    "description",
-    "vendor_id",
-    "bill_number",
-    "bill_date",
-    "taxable_amount",
-    "cgst_amount",
-    "sgst_amount",
-    "igst_amount",
-    "cgst_rate",
-    "sgst_rate",
-    "igst_rate",
-    "supplier_name",
-    "supplier_gstin",
-    "supplier_msme",
-)
-
-
-def _text(v: object) -> str | None:
-    return None if v is None else str(v)
-
-
-def _resync_route(db: Session, expense: Expense, steps: list[ApprovalStep]) -> list[str]:
-    """After an amount change, add or skip the later levels the new total needs (e.g. MD
-    above the limit). Steps already approved or the current one are never touched."""
-    planned = routing_service.plan_route(db, expense)
-    needed = {p.rule.id: p for p in planned if p.status != "SKIPPED"}
-    current = next(s for s in steps if s.status == "PENDING")
-    changes: list[str] = []
-    for s in steps:
-        if s.sequence <= current.sequence:
-            continue
-        if s.status == "WAITING" and s.rule_id not in needed:
-            s.status, s.note = "SKIPPED", AFTER_CORRECTION
-            changes.append(f"{s.level.code} no longer needed")
-        elif s.status == "SKIPPED" and s.note == AFTER_CORRECTION and s.rule_id in needed:
-            s.status, s.note = "WAITING", None
-            changes.append(f"{s.level.code} needed again")
-    have = {s.rule_id for s in steps}
-    seq = max(s.sequence for s in steps)
-    for rule_id, p in needed.items():
-        if rule_id in have or p.rule.level.rank <= current.level.rank:
-            continue
-        seq += 1
-        db.add(
-            ApprovalStep(
-                expense_id=expense.id,
-                cycle=expense.cycle,
-                sequence=seq,
-                level_id=p.rule.level_id,
-                approver_id=p.rule.approver_id,
-                rule_id=p.rule.id,
-                status="WAITING",
-                note="Added after correction",
-            )
-        )
-        changes.append(f"{p.rule.level.code} added ({p.rule.approver.full_name})")
-    return changes
-
-
-AFTER_CORRECTION = "Not needed after correction"
-
-
-def correct(db: Session, principal: Principal, expense_id: int, data: CorrectionRequest) -> dict:
-    """Finance check (F&A ratification) corrects bill details while the claim is with them.
-    Every changed value is audited old -> new; the employee is told what changed."""
-    expense = _load(db, principal, expense_id, "correct", data.version)
-    by_id = {i.id: i for i in expense.items}
-    changed: dict[str, dict[str, list[str | None]]] = {}
-    for src in data.items:
-        item = by_id.get(src.id)
-        if item is None:
-            raise AppError(422, "VALIDATION_ERROR", f"Line item {src.id} is not on this expense")
-        if src.vendor_id and src.vendor_id != item.vendor_id:
-            vendor = db.get(Partner, src.vendor_id)
-            if vendor is None or not vendor.is_active:
-                raise AppError(422, "VALIDATION_ERROR", "Vendor does not exist or is inactive")
-        diff = {}
-        for field in CORRECTABLE:
-            old, new = getattr(item, field), getattr(src, field)
-            if _text(old) != _text(new):
-                diff[field] = [_text(old), _text(new)]
-                setattr(item, field, new)
-        if diff:
-            changed[f"line {item.line_no}"] = diff
-    if not changed:
-        raise AppError(422, "VALIDATION_ERROR", "Nothing was changed")
-    before_total = expense.total_amount
-    expense_rules.recalc_totals(expense)
-    expense.updated_at = utcnow()
-    db.flush()
-    db.expire(expense, ["items"])
-    invoice_check.assert_no_duplicates(db, expense, expense.owner_id)
-    for item in expense.items:
-        item.snapshot_vendor_name = item.vendor.name if item.vendor else item.supplier_name
-        item.snapshot_vendor_gstin = (
-            item.vendor.gstin if item.vendor else None
-        ) or item.supplier_gstin
-    route_changes = (
-        _resync_route(db, expense, _steps(db, expense))
-        if expense.total_amount != before_total
-        else []
-    )
-    level_code = expense.current_level.code if expense.current_level else None
-    note = data.comment
-    if expense.total_amount != before_total:
-        note += f" (total {money_str(before_total)} -> {money_str(expense.total_amount)})"
-    if route_changes:
-        note += "; route: " + ", ".join(route_changes)
-    db.add(
-        ExpenseHistory(
-            expense_id=expense.id,
-            action="CORRECTED",
-            from_status=expense.status,
-            to_status=expense.status,
-            level_code=level_code,
-            actor_id=principal.user.id,
-            comment=note,
-            ip_address=get_request_context().ip_address,
-        )
-    )
-    audit_service.record(
-        db,
-        "EXPENSE_CORRECTED",
-        "expense",
-        expense.id,
-        actor=principal.user,
-        details={
-            "changes": changed,
-            "total": [money_str(before_total), money_str(expense.total_amount)],
-            "route": route_changes,
-            "comment": data.comment,
-        },
-    )
-    engagement_service.notify(
-        db,
-        [expense.owner_id],
-        "CORRECTED",
-        f"Finance corrected your claim: {expense.title}",
-        note,
-        expense.id,
-    )
-    body = serialize(db, expense.id)
-    db.commit()
-    return body

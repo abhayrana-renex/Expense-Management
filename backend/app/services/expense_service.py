@@ -137,11 +137,11 @@ def _apply_header(db: Session, expense: Expense, data: ExpenseIn, principal: Pri
     if department_id is None:
         raise AppError(422, "VALIDATION_ERROR", "Choose a department")
     _require_active(db, Department, department_id, "Department")
-    _require_active(db, ExpenseType, data.expense_type_id, "Expense type")
+    expense_type = _require_active(db, ExpenseType, data.expense_type_id, "Expense type")
     _require_active(db, Branch, branch_id, "Branch")
     _require_active(db, CostCentre, data.cost_centre_id, "Cost centre")
     _require_active(db, BillMonth, data.bill_month_id, "Bill month")
-    expense.title = data.title.strip()
+    expense.title = (data.title or "").strip() or _label(db, data, expense_type.name)
     expense.purpose = data.purpose
     expense.expense_type_id = data.expense_type_id
     expense.branch_id = branch_id
@@ -168,6 +168,19 @@ def _apply_header(db: Session, expense: Expense, data: ExpenseIn, principal: Pri
     ):
         value = getattr(data, field) if keep else None
         setattr(expense, field, value.strip() or None if isinstance(value, str) else value)
+
+
+def _label(db: Session, data: ExpenseIn, type_name: str) -> str:
+    """Claims are known by their expense number; this short label (vendor - month) is kept
+    only for search and the ledger narration."""
+    first = data.items[0] if data.items else None
+    who = None
+    if first is not None:
+        vendor = db.get(Partner, first.vendor_id) if first.vendor_id else None
+        who = (vendor.name if vendor else None) or (first.supplier_name or "").strip() or None
+    when = data.bill_period_start or (first and (first.bill_date or first.expense_date))
+    month = when.strftime("%b %Y") if when else None
+    return " - ".join(p for p in (who or type_name, month) if p)[:200]
 
 
 BASE_DOC_KIND = {"ADHOC": "APPROVAL", "CONTRACT": "CONTRACT"}

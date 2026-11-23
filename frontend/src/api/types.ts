@@ -157,9 +157,12 @@ export interface InvoiceCheck {
 }
 
 export type ActionName = "edit" | "submit" | "cancel" | "upload_bill" | "approve" | "reject"
-  | "return" | "send_back" | "correct" | "reopen" | "record_payment";
+  | "return" | "send_back" | "reopen" | "record_payment";
+/** Who a send-back can go to: "owner" (the initiator, to rewrite the bill) or an earlier
+ *  approver's step id (to answer a question). */
+export interface SendBackTarget { to: string; name: string; level: string | null; role: string }
 export type AllowedActions = Record<ActionName, boolean> & { send_back_to?: string | null;
-  payment_actions?: PaymentAction[] };
+  send_back_targets: SendBackTarget[]; payment_actions?: PaymentAction[] };
 
 export interface ValidationIssue {
   code: string;
@@ -221,6 +224,8 @@ export interface ApprovalRule {
 export interface Dashboard {
   role: string;
   scope: string;
+  /** Spend charts: approvers only. Spend by department: Finance, F&A check, MD. */
+  show?: { spend_charts: boolean; department_spend: boolean };
   kpis: Record<string, number | string>;
   series: {
     by_month: { month: string; count: number; amount: Money; approved_amount: Money }[];

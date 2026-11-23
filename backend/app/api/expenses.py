@@ -16,7 +16,6 @@ from app.schemas.common import ERROR_RESPONSES, ErrorResponse, Message, PagePara
 from app.schemas.expense import (
     ActionRequest,
     AllowedActions,
-    CorrectionRequest,
     DocumentOut,
     ExpenseCreate,
     ExpenseOut,
@@ -244,28 +243,12 @@ def allowed_actions(
     out["send_back_to"] = (
         approval_service.send_back_target(db, expense) if out["send_back"] else None
     )
+    out["send_back_targets"] = (
+        approval_service.send_back_targets(db, expense) if out["send_back"] else []
+    )
     out["payment_actions"] = payment_service.allowed(expense, principal)
     out["record_payment"] = bool(out["payment_actions"])
     return out
-
-
-@router.put(
-    "/{expense_id}/correction",
-    response_model=ExpenseOut,
-    summary="Finance check: correct bill details",
-    description="Only the current approver holding `expense.correct` (F&A ratification), "
-    "while the claim is with them. Every changed value is audited old -> new, totals are "
-    "recalculated, and later levels are re-planned (e.g. MD added or skipped when the "
-    "total crosses the limit). The employee is notified.",
-    responses={**CONFLICT, 422: {"model": ErrorResponse}},
-)
-def correct_expense(
-    expense_id: int,
-    body: CorrectionRequest,
-    principal: Principal = Depends(get_principal),
-    db: Session = Depends(get_db),
-):
-    return JSONResponse(approval_service.correct(db, principal, expense_id, body))
 
 
 @router.post(
@@ -335,9 +318,12 @@ Action = Literal["approve", "send_back", "reject", "return", "cancel", "reopen"]
     response_model=ExpenseOut,
     summary="Workflow action",
     description="approve / send_back / reject / return (current approver), cancel (owner, "
-    "before final approval), reopen (ADMIN, REJECTED -> RETURNED). send_back pushes the claim "
-    "one step back: to the previous approver, or to the employee from the first level - it "
-    "never cancels. A comment is mandatory. Supports Idempotency-Key.",
+    "before final approval), reopen (ADMIN, REJECTED -> RETURNED). send_back never cancels: "
+    "`to` = \"owner\" sends it to the initiator to rewrite the bill (it is routed from the "
+    "first approver again on resubmit); `to` = a step id from allowed-actions "
+    "`send_back_targets` sends it to that earlier approver with a question; left out = one "
+    "step back. Only the initiator ever edits the bill. A comment is mandatory. Supports "
+    "Idempotency-Key.",
     responses=CONFLICT,
 )
 def workflow_action(
@@ -358,7 +344,9 @@ def workflow_action(
     if replay:
         return JSONResponse(replay.response_body, status_code=replay.status_code)
     return JSONResponse(
-        approval_service.act(db, principal, expense_id, action, body.comment, body.version, ctx)
+        approval_service.act(
+            db, principal, expense_id, action, body.comment, body.version, ctx, to=body.to
+        )
     )
 
 

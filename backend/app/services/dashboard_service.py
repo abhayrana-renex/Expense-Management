@@ -98,8 +98,13 @@ def summary(db: Session, principal: Principal, months: int = 6) -> dict[str, Any
         .order_by(func.sum(Expense.total_amount).desc())
     ).all()
 
+    # Spend charts are for people who approve; department-wise spend only for the roles that
+    # hold report.department_spend (Finance, F&A check, MD). Others get empty series.
+    charts = principal.can("expense.approve")
+    departments = principal.can("report.department_spend")
     return {
         "role": principal.role,
+        "show": {"spend_charts": charts, "department_spend": departments},
         "kpis": {
             "my_drafts": mine[0],
             "my_pending_count": mine[1],
@@ -118,13 +123,17 @@ def summary(db: Session, principal: Principal, months: int = 6) -> dict[str, Any
                     "approved_amount": _money(r[3]),
                 }
                 for r in by_month
-            ],
+            ]
+            if charts
+            else [],
             "by_status": [
                 {"status": r[0], "count": r[1], "amount": _money(r[2])} for r in by_status
             ],
             "by_category": top(
                 ExpenseType.name, ExpenseType, ExpenseType.id == Expense.expense_type_id
-            ),
+            )
+            if charts
+            else [],
             "by_branch": top(Branch.name, Branch, Branch.id == Expense.branch_id),
             # Department-wise spend (submitted and approved), within the viewer's scope.
             "by_department": [
@@ -135,7 +144,9 @@ def summary(db: Session, principal: Principal, months: int = 6) -> dict[str, Any
                     "approved_amount": _money(r[3]),
                 }
                 for r in by_department
-            ],
+            ]
+            if departments
+            else [],
         },
         "scope": principal.scope("report.read") or principal.scope("expense.read"),
     }

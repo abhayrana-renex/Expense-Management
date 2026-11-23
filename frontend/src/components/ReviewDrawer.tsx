@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
-  AlertTriangle, Check, CheckCircle2, CornerUpLeft, ExternalLink, FileText, SquarePen, X,
+  AlertTriangle, Check, CheckCircle2, CornerUpLeft, ExternalLink, FileText, X,
 } from "lucide-react";
 import { api } from "../api/client";
 import type { AllowedActions, Expense, ValidationIssue } from "../api/types";
@@ -83,9 +83,9 @@ export function ReviewDrawer({ expenseId, position, onClose, onDone }: {
         <div className="drawer-head">
           {e && <Avatar name={e.owner.full_name} />}
           <div style={{ minWidth: 0 }}>
-            <div className="cell-main" style={{ fontSize: "var(--fs-md)" }}>{e?.title ?? "Loading…"}</div>
-            {e && <div className="cell-sub">{e.owner.full_name} · {e.department.name} ·
-              <span className="mono"> {e.expense_no}</span></div>}
+            <div className="cell-main mono" style={{ fontSize: "var(--fs-md)" }}>
+              {e?.expense_no ?? "Loading…"}</div>
+            {e && <div className="cell-sub">{e.owner.full_name} · {e.department.name}</div>}
           </div>
           <span className="spacer" />
           <span className="muted small">{position}</span>
@@ -156,12 +156,9 @@ export function ReviewDrawer({ expenseId, position, onClose, onDone }: {
             onChange={(ev) => setComment(ev.target.value)} />
           <div className="row">
             <button className="btn" disabled={!!busy || !a?.send_back} onClick={() => act("send_back")}
-              title="One step back - nothing is cancelled">
+              title="One step back - nothing is cancelled. To pick someone else, open the full page">
               <CornerUpLeft size={15} />{busy === "send_back" ? "Sending…"
                 : `Send back${a?.send_back_to ? ` to ${a.send_back_to.split(" (")[0]}` : ""}`}</button>
-            {a?.correct && e && <button className="btn" onClick={() => navigate(`/expenses/${e.id}`)}
-              title="Open the claim to correct amounts, GST or invoice details">
-              <SquarePen size={15} />Correct bill</button>}
             <span className="spacer" />
             <button className="btn btn-success" disabled={!!busy} onClick={() => act("approve")}>
               <Check size={15} />{busy === "approve" ? "Approving…" : "Approve & next"}</button>

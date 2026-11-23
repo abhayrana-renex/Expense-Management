@@ -54,7 +54,6 @@ ROLES: dict[str, tuple[str, dict[str, str]]] = {
             "expense.create": "OWN",
             "expense.read": "ALL",
             "expense.approve": "ASSIGNED",
-            "expense.correct": "ASSIGNED",
             "expense.reopen": "ALL",
             "report.read": "ALL",
             "report.export": "ALL",
@@ -75,8 +74,8 @@ ROLES: dict[str, tuple[str, dict[str, str]]] = {
             "expense.create": "OWN",
             "expense.read": "ASSIGNED",
             "expense.approve": "ASSIGNED",
-            "expense.correct": "ASSIGNED",
             "report.read": "DEPARTMENT",
+            "report.department_spend": "ALL",
             "report.export": "DEPARTMENT",
             "master.read": "ALL",
         },
@@ -89,6 +88,7 @@ ROLES: dict[str, tuple[str, dict[str, str]]] = {
             "expense.approve": "ASSIGNED",
             "payment.approve": "ALL",
             "report.read": "ALL",
+            "report.department_spend": "ALL",
             "report.export": "ALL",
             "master.read": "ALL",
         },
@@ -99,17 +99,20 @@ ROLES: dict[str, tuple[str, dict[str, str]]] = {
             "expense.create": "OWN",
             "expense.read": "ALL",
             "expense.approve": "ASSIGNED",
-            "expense.correct": "ASSIGNED",
             "payment.schedule": "ALL",
             "payment.record": "ALL",
             "ledger.export": "ALL",
             "report.read": "ALL",
+            "report.department_spend": "ALL",
             "report.export": "ALL",
             "master.read": "ALL",
         },
     ),
 }
-ROLES["SUPER_ADMIN"] = ("Super Administrator", {**ROLES["ADMIN"][1], "role.manage": "ALL"})
+ROLES["SUPER_ADMIN"] = (
+    "Super Administrator",
+    {**ROLES["ADMIN"][1], "role.manage": "ALL", "report.department_spend": "ALL"},
+)
 SYSTEM_ROLES = {"USER", "APPROVER", "ADMIN", "FINANCE", "SUPER_ADMIN", "FA_CHECK", "MD"}
 # GST rate options for CGST / SGST / IGST (owner's list). Admins can add/deactivate rates.
 GST_RATES = ["3", "5", "7", "9", "12", "15", "18"]

@@ -95,8 +95,7 @@ export function Reports() {
                 <th>Status</th><th>Submitted</th><th className="num">Total</th></tr></thead>
               <tbody>{report.data.data.rows.map((e) => (
                 <tr key={e.id} className="clickable" onClick={() => navigate(`/expenses/${e.id}`)}>
-                  <td><div className="cell-main clip" title={e.title}>{e.title}</div>
-                    <div className="cell-sub mono">{e.expense_no}</div></td>
+                  <td><div className="cell-main mono">{e.expense_no}</div></td>
                   <td>{e.owner.full_name}</td><td>{e.department.name}</td><td>{e.branch.name}</td>
                   <td><StatusPill status={e.status} payment={e.payment_status} /></td>
                   <td className="muted">{date(e.submitted_at)}</td>

@@ -81,8 +81,9 @@ def test_send_back_goes_one_step_and_never_cancels(api, chain):
     api.act("approver1", exp["id"], "approve")
     api.act("approver2", exp["id"], "approve")
     allowed = api.get("finadmin", f"/api/expenses/{exp['id']}/allowed-actions").json()
-    assert allowed["send_back"] and allowed["correct"]
+    assert allowed["send_back"] and "correct" not in allowed
     assert allowed["send_back_to"].endswith("(L2)")
+    assert [t["level"] for t in allowed["send_back_targets"]] == [None, "L1", "L2"]
 
     r = api.act("finadmin", exp["id"], "send_back", comment="Check the vendor name")
     assert r.status_code == 200, r.text
@@ -107,40 +108,55 @@ def test_send_back_goes_one_step_and_never_cancels(api, chain):
     assert again["status"] == "PENDING_L1"
 
 
-def test_finance_corrects_bill_and_md_is_added(api, chain):
+def test_send_back_to_any_earlier_person(api, chain):
     exp = api.new_expense("user1", ["30000.00"], submit=True)
     api.act("approver1", exp["id"], "approve")
-    item = exp["items"][0]
-    body = {
-        "comment": "Bill total is 60,000 - typo by employee",
-        "version": None,
-        "items": [
-            {
-                **{k: item[k] for k in ("id", "description", "bill_number")},
-                "taxable_amount": "60000.00",
-                "supplier_name": "ABC Traders",
-            }
-        ],
-    }
-    # L1 is not the Finance check: no correction right
-    body["version"] = api.get("user1", f"/api/expenses/{exp['id']}").json()["version"]
-    assert (
-        api.put("approver2", f"/api/expenses/{exp['id']}/correction", json=body).status_code == 403
-    )
     api.act("approver2", exp["id"], "approve")
-    body["version"] = api.get("user1", f"/api/expenses/{exp['id']}").json()["version"]
-    assert (
-        api.put("approver1", f"/api/expenses/{exp['id']}/correction", json=body).status_code == 403
-    )
-    r = api.put("finadmin", f"/api/expenses/{exp['id']}/correction", json=body)
+    targets = api.get("finadmin", f"/api/expenses/{exp['id']}/allowed-actions").json()[
+        "send_back_targets"
+    ]
+    l1 = next(t for t in targets if t["level"] == "L1")
+    # Finance asks L1 a question directly, skipping L2; L2 must approve again afterwards
+    r = api.act("finadmin", exp["id"], "send_back", comment="Why this vendor?", to=l1["to"])
     assert r.status_code == 200, r.text
-    assert r.json()["total_amount"] == "60000.00"
-    assert r.json()["items"][0]["supplier_name"] == "ABC Traders"
-    assert ("MD", "WAITING") in route(api, exp["id"])
-    hist = api.get("user1", f"/api/expenses/{exp['id']}/history").json()
-    assert hist[-1]["action"] == "CORRECTED" and "MD added" in hist[-1]["comment"]
-    assert api.act("finadmin", exp["id"], "approve").json()["status"] == "PENDING_MD"
-    assert api.act("approver3", exp["id"], "approve").json()["status"] == "APPROVED"
+    assert r.json()["status"] == "PENDING_L1"
+    assert ("L2", "WAITING") in route(api, exp["id"])
+    assert api.act("approver1", exp["id"], "approve").json()["status"] == "PENDING_L2"
+    assert api.act("approver2", exp["id"], "approve").json()["status"] == "PENDING_L3"
+
+    # someone who has not approved yet is not a valid target
+    md_like = api.act("finadmin", exp["id"], "send_back", comment="x" * 5, to="999999")
+    assert md_like.status_code == 422
+
+    # straight to the initiator to rewrite the bill; resubmit starts again from L1
+    back = api.act("finadmin", exp["id"], "send_back", comment="Rewrite the bill", to="owner")
+    assert back.json()["status"] == "RETURNED"
+    assert api.get("user1", f"/api/expenses/{exp['id']}/allowed-actions").json()["edit"]
+    again = api.post("user1", f"/api/expenses/{exp['id']}/submit").json()
+    assert again["status"] == "PENDING_L1"
+
+
+def test_approvers_cannot_edit_the_bill(api, chain):
+    exp = api.new_expense("user1", ["30000.00"], submit=True)
+    api.act("approver1", exp["id"], "approve")
+    api.act("approver2", exp["id"], "approve")
+    allowed = api.get("finadmin", f"/api/expenses/{exp['id']}/allowed-actions").json()
+    assert not allowed["edit"]
+    item = exp["items"][0]
+    body = {"comment": "fix", "version": 1, "items": [{"id": item["id"], "description": "x",
+                                                         "taxable_amount": "1.00"}]}
+    gone = api.put("finadmin", f"/api/expenses/{exp['id']}/correction", json=body)
+    assert gone.status_code in (404, 405)
+
+
+def test_title_is_optional_and_labelled_by_vendor_and_month(api):
+    body = {
+        "expense_type_id": api.lookup("user1", "expense-types", "MISC"),
+        "items": [_line(f"INV-{uuid.uuid4().hex[:6]}", supplier_name="Kestrel Supplies")],
+    }
+    r = api.post("user1", "/api/expenses", json=body)
+    assert r.status_code == 201, r.text
+    assert r.json()["title"] == "Kestrel Supplies - Oct 2026"
 
 
 def _line(number, **kw):

@@ -215,8 +215,7 @@ export function Payments() {
                       aria-label={`Select ${r.expense_no}`} /></td>)}
                 <td><div className="row"><Avatar name={r.owner.full_name} size="sm" />
                   <span className="cell-main">{r.owner.full_name}</span></div></td>
-                <td><div className="cell-main clip" title={r.title}>{r.title}</div>
-                  <div className="cell-sub mono">{r.expense_no}</div></td>
+                <td><div className="cell-main mono">{r.expense_no}</div></td>
                 <td className="muted clip" title={r.department.name ?? undefined}>{r.department.name}</td>
                 <td className={stage !== "PENDING" && r.payment_scheduled_for && r.payment_scheduled_for < today()
                   ? "wait-late" : ""}>{stage === "PENDING" ? date(r.approved_at) : date(r.payment_scheduled_for)}</td>

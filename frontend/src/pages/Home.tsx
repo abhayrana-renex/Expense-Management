@@ -121,6 +121,10 @@ export function Home() {
   const greet = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const cats = dash.data?.series.by_category ?? [];
   const catMax = Math.max(...cats.map((c) => Number(c.amount)), 1);
+  // Spend charts: people who approve. Spend by department: Finance, F&A check and MD. The
+  // server sends the data only to them; these flags just decide which cards to draw.
+  const showSpend = dash.data?.show?.spend_charts ?? can("expense.approve");
+  const showDepartments = dash.data?.show?.department_spend ?? can("report.department_spend");
 
   return (
     <>
@@ -143,7 +147,7 @@ export function Home() {
             { compact: true })} foot="Reimbursable" />}
       </div>
 
-      <div className="split" style={{ marginBottom: 12 }}>
+      {showSpend && <div className="split" style={{ marginBottom: 12 }}>
         <div className="card">
           <div className="card-head"><h3>Spend over time</h3>
             <span className="sub">Last 6 months · {dash.data?.scope === "ALL" ? "Company"
@@ -168,9 +172,9 @@ export function Home() {
             ))}
           </div>
         </div>
-      </div>
+      </div>}
 
-      <div className="card" style={{ marginBottom: 12 }}>
+      {showDepartments && <div className="card" style={{ marginBottom: 12 }}>
         <div className="card-head"><h3>Spend by department</h3>
           <span className="sub">{dash.data?.scope === "ALL" ? "Company" : dash.data?.scope === "OWN"
             ? "Your expenses" : "Your scope"} · submitted, not cancelled</span>
@@ -178,7 +182,7 @@ export function Home() {
           <SpendLegend /></div>
         <div className="card-body"><SpendNote />{dash.isLoading ? <Skeleton rows={4} />
           : <DepartmentBars data={dash.data?.series.by_department ?? []} />}</div>
-      </div>
+      </div>}
 
       <div className={can("expense.approve") ? "grid grid-2" : ""}>
         {can("expense.approve") && (
@@ -215,9 +219,9 @@ function ExpenseMiniList({ rows, showOwner }: { rows: ExpenseSummary[]; showOwne
             <div className="row">
               {showOwner && <Avatar name={e.owner.full_name} size="sm" />}
               <div>
-                <div className="cell-main clip" title={e.title}>{e.title}</div>
+                <div className="cell-main mono">{e.expense_no}</div>
                 <div className="cell-sub">{showOwner ? `${e.owner.full_name} · ` : ""}
-                  {e.expense_no} · {date(e.submitted_at ?? e.created_at)}</div>
+                  {date(e.submitted_at ?? e.created_at)}</div>
               </div>
             </div>
           </td>

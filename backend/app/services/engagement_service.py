@@ -65,7 +65,7 @@ def notify_pending(db: Session, e: Expense) -> None:
         db,
         ids,
         "APPROVAL_NEEDED",
-        f"Approval needed: {e.title}",
+        f"Approval needed: {e.expense_no}",
         f"{e.owner.full_name} · {tag(e)}",
         e.id,
     )

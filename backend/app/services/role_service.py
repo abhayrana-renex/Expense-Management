@@ -21,7 +21,9 @@ def catalogue() -> list[dict]:
 
 
 def _grants(role: Role) -> dict[str, str]:
-    return {g.permission.code: g.scope for g in role.grants}
+    # Rights retired from the catalogue (e.g. the old "correct bill") may still sit in the
+    # table; they grant nothing, so they are not shown or sent back.
+    return {g.permission.code: g.scope for g in role.grants if g.permission.code in PERMISSIONS}
 
 
 def list_roles(db: Session) -> list[dict]:

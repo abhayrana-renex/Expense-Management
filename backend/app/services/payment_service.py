@@ -336,7 +336,7 @@ def _notify(
             db,
             engagement_service.holders_of(db, "payment.schedule"),
             "PAYMENT_SENT_BACK",
-            f"Payment sent back: {first.title}" if n == 1 else f"{n} payments sent back",
+            f"Payment sent back: {first.expense_no}" if n == 1 else f"{n} payments sent back",
             f"{principal.user.full_name}: {note}",
             first.id if n == 1 else None,
         )
@@ -345,7 +345,7 @@ def _notify(
             db,
             engagement_service.holders_of(db, "payment.approve"),
             "PAYMENT_SENT_BACK",
-            f"Payment back for approval: {first.title}",
+            f"Payment back for approval: {first.expense_no}",
             f"{principal.user.full_name}: {note}",
             first.id,
         )
@@ -354,7 +354,7 @@ def _notify(
             db,
             [first.owner_id],
             "PAID",
-            f"Paid: {first.title}",
+            f"Paid: {first.expense_no}",
             f"₹{first.paid_amount:,.2f} by {first.payment_mode}"
             + (f" · UTR {first.payment_reference}" if first.payment_reference else ""),
             first.id,
@@ -364,7 +364,7 @@ def _notify(
             db,
             [e.owner_id for e in items],
             "PAYMENT_ON_HOLD",
-            f"Payment on hold: {first.title}" if n == 1 else "Payment on hold",
+            f"Payment on hold: {first.expense_no}" if n == 1 else "Payment on hold",
             note,
             first.id if n == 1 else None,
         )

@@ -85,7 +85,7 @@ export function ExpenseForm() {
   /** CONTRACT: the stored contract this claim pays a period of (null = a new one). */
   const [contract, setContract] = useState<Contract | null>(null);
   const [contractExtra, setContractExtra] = useState<ContractExtra>(NO_EXTRA);
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(""); // hidden label; the expense number identifies it
   const titleTouched = useRef(false);
   const purposeTouched = useRef(false);
   const [manual, setManual] = useState(false);
@@ -137,7 +137,7 @@ export function ExpenseForm() {
     titleTouched.current = true;
     purposeTouched.current = true;
     setBillType(src.bill_type ?? "PO"); setDetails(detailsOf(src));
-    setTitle(`${src.title} (copy)`.slice(0, 200)); setPurpose(src.purpose ?? "");
+    setTitle(""); setPurpose(src.purpose ?? "");
     setTypeId(String(src.expense_type.id)); setBranchId(String(src.branch.id));
     setCentreId(src.cost_centre ? String(src.cost_centre.id) : "");
     centreTouched.current = true; // a copy keeps its own cost centre
@@ -289,7 +289,8 @@ export function ExpenseForm() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines]);
 
-  // PO bills: suggest title and category from what was read (until the person types their own).
+  // Bills read: suggest the category, and keep a short label (vendor - bill no.) that is not
+  // shown - claims are known by their expense number - but helps search and the ledger.
   useEffect(() => {
     const read = lines.filter((l) => l.reading === "done");
     if (!read.length) return;
@@ -432,7 +433,7 @@ export function ExpenseForm() {
     const money = (v: string) => (v.trim() === "" ? "0.00" : v.trim());
     const opt = (v: string) => (v.trim() === "" ? null : v.trim());
     return {
-      title, purpose: purpose || null, expense_type_id: Number(typeId),
+      title: title.trim() || null, purpose: purpose || null, expense_type_id: Number(typeId),
       branch_id: branchId ? Number(branchId) : null,
       cost_centre_id: centreId ? Number(centreId) : null,
       bill_month_id: monthId ? Number(monthId) : null,
@@ -472,7 +473,6 @@ export function ExpenseForm() {
 
   function localErrors(submit: boolean): string | null {
     if (!lines.length) return "Add at least one bill.";
-    if (!title.trim()) return "Give the expense a title.";
     if (!typeId) return "Choose a category.";
     if (!deptId) return "Choose the department.";
     if (Boolean(periodFrom) !== Boolean(periodTo)) return "Enter both dates of the bill period (or neither).";
@@ -581,11 +581,6 @@ export function ExpenseForm() {
   const showLines = hasBills || manual;
   const claimFields = (
     <>
-      <Field label="Title" full>
-        <input className="input" value={title} maxLength={200}
-          placeholder={billType === "ADHOC" ? "e.g. Claude Pro subscription - Nov" : "e.g. Laptop repair"}
-          onChange={(e) => { titleTouched.current = true; setTitle(e.target.value); }} />
-      </Field>
       <Field label="Category">
         <Select className="select" value={typeId} onChange={(e) => setTypeId(e.target.value)}>
           <option value="">Select category</option>
