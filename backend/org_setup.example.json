@@ -25,14 +25,14 @@
     {
       "username": "l1_hod",
       "employee_code": "EMP1302",
-      "role": "APPROVER",
+      "role": "HOD_CFO",
       "name": "Priya Sharma",
       "note": "L1 HOD"
     },
     {
       "username": "l2_cfo",
       "employee_code": "EMP1403",
-      "role": "APPROVER",
+      "role": "HOD_CFO",
       "name": "Kiran Rao",
       "note": "L2 CFO"
     },

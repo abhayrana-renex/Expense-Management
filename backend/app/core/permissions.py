@@ -31,6 +31,11 @@ PERMISSIONS: dict[str, tuple[str, str, tuple[str, ...]]] = {
         ("DEPARTMENT", "ALL"),
     ),
     "ledger.export": ("Download the general ledger", "Payments", ("ALL",)),
+    "vendor_bank.approve": (
+        "Approve a vendor's bank account before it is used for payments (checker)",
+        "Masters",
+        ("ALL",),
+    ),
     "report.read": ("Run reports", "Reports", ALL_SCOPES),
     "report.department_spend": (
         "See spend by department on Home (Finance, F&A check, MD)",

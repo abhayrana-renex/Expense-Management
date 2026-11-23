@@ -15,7 +15,7 @@ from app.schemas.auth import (
     UserOut,
 )
 from app.schemas.common import ErrorResponse, Message
-from app.services import auth_service, expense_defaults
+from app.services import approval_service, auth_service, expense_defaults
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -92,6 +92,7 @@ def me(
             "expiry_days": settings.PASSWORD_EXPIRY_DAYS,
         },
         "expense_defaults": expense_defaults.for_user(db, user),
+        "approves": approval_service.approves(db, principal),
     }
 
 

@@ -171,3 +171,20 @@ def test_user_admin_guards(api):
         json={"temporary_password": "Reset#Pass2468"},
     )
     assert r.status_code == 200
+
+
+def test_hod_and_cfo_see_the_whole_dashboard(api, db):
+    from sqlalchemy import select
+
+    from app.models import Role, User
+
+    exp = api.new_expense("user2", ["2500.00"], submit=True)  # another department
+    assert exp["status"].startswith("PENDING")
+    hod = db.execute(select(User).where(User.username == "approver2")).unique().scalar_one()
+    hod.role = db.execute(select(Role).where(Role.code == "HOD_CFO")).unique().scalar_one()
+    db.flush()
+    dash = api.get("approver2", "/api/dashboard/summary").json()
+    assert dash["show"] == {"spend_charts": True, "department_spend": True}
+    assert dash["scope"] == "ALL" and dash["series"]["by_department"]
+    # company-wide charts, but they still open only claims routed to them
+    assert api.get("approver2", f"/api/expenses/{exp['id']}").status_code == 404

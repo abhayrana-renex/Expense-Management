@@ -20,7 +20,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Partner, VendorProfile
+from app.models import Partner, VendorGstRegistration, VendorProfile
 from app.services.bills import extras
 
 _SUFFIXES = re.compile(r"\b(private|pvt|limited|ltd|llp|india|co|company|the|and|&)\b\.?", re.I)
@@ -171,11 +171,27 @@ def _by_pan(vendors: list[Partner], gstin: str) -> Partner | None:
 
 
 def _by_gstin(db: Session, gstin: str) -> Partner | None:
-    return (
+    """The vendor's main GSTIN, or any active GST registration in the vendor master."""
+    hit = (
         db.execute(
             select(Partner)
             .join(VendorProfile, VendorProfile.partner_id == Partner.id)
             .where(VendorProfile.gstin == gstin.upper(), Partner.status == "Active")
+        )
+        .unique()
+        .scalar_one_or_none()
+    )
+    if hit is not None:
+        return hit
+    return (
+        db.execute(
+            select(Partner)
+            .join(VendorGstRegistration, VendorGstRegistration.partner_id == Partner.id)
+            .where(
+                VendorGstRegistration.gstin == gstin.upper(),
+                VendorGstRegistration.is_active.is_(True),
+                Partner.status == "Active",
+            )
         )
         .unique()
         .scalar_one_or_none()

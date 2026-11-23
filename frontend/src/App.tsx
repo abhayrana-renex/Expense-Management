@@ -14,9 +14,11 @@ import { Payments } from "./pages/Payments";
 import { Reports } from "./pages/Reports";
 import { Roles } from "./pages/admin/Roles";
 import { Audit } from "./pages/admin/Audit";
+import { BankApprovals } from "./pages/admin/BankApprovals";
 import { Masters } from "./pages/admin/Masters";
 import { Rules } from "./pages/admin/Rules";
 import { Users } from "./pages/admin/Users";
+import { VendorDetail } from "./pages/admin/VendorDetail";
 
 function Protected({ children, permission, anyOf }: { children: ReactNode; permission?: string;
   anyOf?: string[] }) {
@@ -58,6 +60,8 @@ export default function App() {
         <Route path="account/password" element={<ChangePassword />} />
         <Route path="admin/users" element={<Protected permission="user.manage"><Users /></Protected>} />
         <Route path="admin/masters" element={<Protected permission="master.manage"><Masters /></Protected>} />
+        <Route path="masters/vendors/:id" element={<Protected permission="master.read"><VendorDetail /></Protected>} />
+        <Route path="admin/bank-approvals" element={<Protected permission="vendor_bank.approve"><BankApprovals /></Protected>} />
         <Route path="admin/rules" element={<Protected permission="approval_rule.manage"><Rules /></Protected>} />
         <Route path="admin/audit" element={<Protected permission="audit.read"><Audit /></Protected>} />
         <Route path="*" element={<Navigate to="/" replace />} />

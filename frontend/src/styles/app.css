@@ -822,3 +822,22 @@ kbd { font-family: inherit; font-size: 10px; font-weight: 600; color: var(--ink-
 /* Expense numbers never break across lines. */
 .cell-main.mono { white-space: nowrap; }
 @media (max-width: 600px) { .tbl .avatar-sm { display: none; } }
+
+/* Vendor master details */
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 16px; margin: 8px 0 0; }
+.facts div { min-width: 0; }
+.facts dt { font-size: var(--fs-xs, 12px); color: var(--ink-500); margin-bottom: 2px; }
+.facts dd { margin: 0; font-size: var(--fs-sm); font-weight: 500; overflow-wrap: anywhere; }
+.bank-block { border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; }
+.bank-block .row { flex-wrap: wrap; }
+.bank-block.pending { border-color: #f6d9ad; background: var(--amber-50); }
+.pill-btn { border: 0; cursor: pointer; font: inherit; font-size: 11px; }
+.pill-btn:hover { filter: brightness(0.96); }
+.tab-count { margin-left: 6px; font-size: 11px; color: var(--ink-500); background: var(--grey-50);
+  border-radius: 999px; padding: 0 6px; }
+.tab-dot { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%;
+  background: var(--amber-600); vertical-align: middle; }
+.contact-tbl td { vertical-align: middle; }
+.contact-tbl td:first-child { width: 170px; white-space: nowrap; }
+.contact-tbl .input { min-width: 140px; }
+@media (max-width: 900px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

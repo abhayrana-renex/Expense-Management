@@ -596,6 +596,86 @@
         "title": "BankFileRequest",
         "type": "object"
       },
+      "BankIn": {
+        "properties": {
+          "account_no": {
+            "maxLength": 30,
+            "title": "Account No",
+            "type": "string"
+          },
+          "account_type": {
+            "enum": [
+              "SAVINGS",
+              "CURRENT",
+              "CC",
+              "OD"
+            ],
+            "title": "Account Type",
+            "type": "string"
+          },
+          "bank_branch": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Branch"
+          },
+          "bank_name": {
+            "maxLength": 120,
+            "title": "Bank Name",
+            "type": "string"
+          },
+          "ifsc": {
+            "maxLength": 11,
+            "title": "Ifsc",
+            "type": "string"
+          },
+          "signing_authority": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signing Authority"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "wef": {
+            "description": "With effect from",
+            "format": "date",
+            "title": "Wef",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_type",
+          "account_no",
+          "ifsc",
+          "bank_name",
+          "wef"
+        ],
+        "title": "BankIn",
+        "type": "object"
+      },
       "BillDocument": {
         "properties": {
           "content_type": {
@@ -734,6 +814,65 @@
           "extraction"
         ],
         "title": "BillReadResult",
+        "type": "object"
+      },
+      "Body_add_contract_api_masters_vendors__partner_id__contracts_post": {
+        "properties": {
+          "contract_no": {
+            "maxLength": 100,
+            "title": "Contract No",
+            "type": "string"
+          },
+          "contract_type": {
+            "enum": [
+              "NDA",
+              "MSA",
+              "DO"
+            ],
+            "title": "Contract Type",
+            "type": "string"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "format": "binary",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          },
+          "is_active": {
+            "default": true,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contract_type",
+          "contract_no",
+          "start_date"
+        ],
+        "title": "Body_add_contract_api_masters_vendors__partner_id__contracts_post",
         "type": "object"
       },
       "Body_post_message_api_expenses__expense_id__messages_post": {
@@ -1132,6 +1271,63 @@
           "new_password"
         ],
         "title": "ChangePasswordRequest",
+        "type": "object"
+      },
+      "ContactIn": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "kind": {
+            "enum": [
+              "L1_SUPPORT",
+              "L2_SUPPORT",
+              "L3_SUPPORT",
+              "BILLING",
+              "ACCOUNT_MANAGER",
+              "ESCALATION"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "ContactIn",
         "type": "object"
       },
       "ContractOut": {
@@ -1559,6 +1755,19 @@
           }
         },
         "title": "CostCentreUpdate",
+        "type": "object"
+      },
+      "DecisionIn": {
+        "properties": {
+          "note": {
+            "default": "",
+            "description": "Required when rejecting",
+            "maxLength": 500,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "title": "DecisionIn",
         "type": "object"
       },
       "DelegationIn": {
@@ -4297,6 +4506,50 @@
         "title": "Extraction",
         "type": "object"
       },
+      "GstIn": {
+        "properties": {
+          "branch_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Name"
+          },
+          "gstin": {
+            "maxLength": 15,
+            "title": "Gstin",
+            "type": "string"
+          },
+          "is_active": {
+            "default": true,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Defaults to the GSTIN's state",
+            "title": "State"
+          }
+        },
+        "required": [
+          "gstin"
+        ],
+        "title": "GstIn",
+        "type": "object"
+      },
       "GstRateIn": {
         "properties": {
           "applies_to": {
@@ -4359,6 +4612,47 @@
           "is_active"
         ],
         "title": "GstRateOut",
+        "type": "object"
+      },
+      "GstUpdate": {
+        "properties": {
+          "branch_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Name"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "title": "GstUpdate",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -4553,6 +4847,12 @@
       },
       "MeOut": {
         "properties": {
+          "approves": {
+            "default": false,
+            "description": "Takes part in approvals (approver on an active rule, covering for one, or a claim waiting for them). Initiators who only raise bills: false - no Approvals menu.",
+            "title": "Approves",
+            "type": "boolean"
+          },
           "expense_defaults": {
             "additionalProperties": {
               "anyOf": [
@@ -13862,6 +14162,379 @@
         ]
       }
     },
+    "/api/masters/vendor-bank-accounts/pending": {
+      "get": {
+        "operationId": "pending_bank_api_masters_vendor_bank_accounts_pending_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {},
+                  "title": "Response Pending Bank Api Masters Vendor Bank Accounts Pending Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Bank changes waiting for a checker",
+        "tags": [
+          "Masters: Vendor details"
+        ]
+      }
+    },
+    "/api/masters/vendor-bank-accounts/{account_id}/{decision}": {
+      "post": {
+        "operationId": "decide_bank_api_masters_vendor_bank_accounts__account_id___decision__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "decision",
+            "required": true,
+            "schema": {
+              "enum": [
+                "approve",
+                "reject"
+              ],
+              "title": "Decision",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Decide Bank Api Masters Vendor Bank Accounts  Account Id   Decision  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Approve or reject a bank change (checker, never the maker)",
+        "tags": [
+          "Masters: Vendor details"
+        ]
+      }
+    },
+    "/api/masters/vendor-contracts/{contract_id}/document": {
+      "get": {
+        "operationId": "contract_document_api_masters_vendor_contracts__contract_id__document_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contract_id",
+            "required": true,
+            "schema": {
+              "title": "Contract Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Download the signed contract",
+        "tags": [
+          "Masters: Vendor details"
+        ]
+      }
+    },
+    "/api/masters/vendor-contracts/{contract_id}/{state}": {
+      "post": {
+        "operationId": "contract_state_api_masters_vendor_contracts__contract_id___state__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contract_id",
+            "required": true,
+            "schema": {
+              "title": "Contract Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "state",
+            "required": true,
+            "schema": {
+              "enum": [
+                "activate",
+                "deactivate"
+              ],
+              "title": "State",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Contract State Api Masters Vendor Contracts  Contract Id   State  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set a contract active or inactive",
+        "tags": [
+          "Masters: Vendor details"
+        ]
+      }
+    },
+    "/api/masters/vendor-gst/{reg_id}": {
+      "patch": {
+        "operationId": "update_gst_api_masters_vendor_gst__reg_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reg_id",
+            "required": true,
+            "schema": {
+              "title": "Reg Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GstUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Update Gst Api Masters Vendor Gst  Reg Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Change a GST registration's state, branch or status",
+        "tags": [
+          "Masters: Vendor details"
+        ]
+      }
+    },
     "/api/masters/vendors": {
       "get": {
         "description": "Shared live with FAR: changes made here appear in FAR immediately and vice versa. Dropdowns should pass is_active=true. Sort by: name, created_at",
@@ -14395,6 +15068,392 @@
         "summary": "Deactivate vendor",
         "tags": [
           "Masters: Vendor"
+        ]
+      }
+    },
+    "/api/masters/vendors/{partner_id}/bank-accounts": {
+      "post": {
+        "description": "Saved as PENDING; used for payments only after someone else with vendor_bank.approve approves it. One change may wait at a time (409 BANK_CHANGE_PENDING).",
+        "operationId": "request_bank_api_masters_vendors__partner_id__bank_accounts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partner_id",
+            "required": true,
+            "schema": {
+              "title": "Partner Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Request Bank Api Masters Vendors  Partner Id  Bank Accounts Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Enter a bank account or a change (maker)",
+        "tags": [
+          "Masters: Vendor details"
+        ]
+      }
+    },
+    "/api/masters/vendors/{partner_id}/contacts": {
+      "put": {
+        "operationId": "save_contacts_api_masters_vendors__partner_id__contacts_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partner_id",
+            "required": true,
+            "schema": {
+              "title": "Partner Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/ContactIn"
+                },
+                "title": "Body",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Save Contacts Api Masters Vendors  Partner Id  Contacts Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Save the escalation contacts",
+        "tags": [
+          "Masters: Vendor details"
+        ]
+      }
+    },
+    "/api/masters/vendors/{partner_id}/contracts": {
+      "post": {
+        "description": "Multipart. Document: PDF, JPG or PNG, max 10 MB.",
+        "operationId": "add_contract_api_masters_vendors__partner_id__contracts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partner_id",
+            "required": true,
+            "schema": {
+              "title": "Partner Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_add_contract_api_masters_vendors__partner_id__contracts_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Add Contract Api Masters Vendors  Partner Id  Contracts Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add a contract (NDA / MSA / DO) with its signed copy",
+        "tags": [
+          "Masters: Vendor details"
+        ]
+      }
+    },
+    "/api/masters/vendors/{partner_id}/details": {
+      "get": {
+        "operationId": "vendor_details_api_masters_vendors__partner_id__details_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partner_id",
+            "required": true,
+            "schema": {
+              "title": "Partner Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Vendor Details Api Masters Vendors  Partner Id  Details Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Everything the portal keeps on a vendor",
+        "tags": [
+          "Masters: Vendor details"
+        ]
+      }
+    },
+    "/api/masters/vendors/{partner_id}/gst": {
+      "post": {
+        "operationId": "add_gst_api_masters_vendors__partner_id__gst_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "partner_id",
+            "required": true,
+            "schema": {
+              "title": "Partner Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GstIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Add Gst Api Masters Vendors  Partner Id  Gst Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden or password change required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add a GST registration",
+        "tags": [
+          "Masters: Vendor details"
         ]
       }
     },

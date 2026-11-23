@@ -147,11 +147,12 @@ function DepartmentPie({ data, onPick }: { data: DeptRow[]; onPick: (id: number 
 
 export function Home() {
   const { me, can } = useAuth();
+  const approver = can("expense.approve") && me?.approves !== false; // not initiators
   const navigate = useNavigate();
   const dash = useQuery({ queryKey: ["dashboard"],
     queryFn: () => api.get<Dashboard>("/dashboard/summary", { months: 6 }) });
   const queue = useQuery({
-    queryKey: ["queue", "home"], enabled: can("expense.approve"),
+    queryKey: ["queue", "home"], enabled: approver,
     queryFn: () => api.page<ExpenseSummary>("/approvals/queue", { page_size: 5,
       sort: "submitted_at", order: "asc" }),
   });
@@ -178,7 +179,7 @@ export function Home() {
           onClick={() => navigate("/expenses/new")}><Plus size={16} />New expense</button>} />
 
       <div className="grid grid-4" style={{ marginBottom: 12 }}>
-        {can("expense.approve") && <Kpi label="Awaiting your approval" tone="brand"
+        {approver && <Kpi label="Awaiting your approval" tone="brand"
           icon={<Inbox size={16} />} value={String(k.awaiting_my_approval_count ?? "—")}
           foot={inr(k.awaiting_my_approval_amount as string)} />}
         <Kpi label="My pending" tone="amber" icon={<Clock size={16} />}
@@ -187,7 +188,7 @@ export function Home() {
           value={String(k.my_returned ?? "—")} foot="Need your changes" />
         <Kpi label="Drafts" tone="grey" icon={<FileEdit size={16} />}
           value={String(k.my_drafts ?? "—")} foot="Not yet submitted" />
-        {!can("expense.approve") && <Kpi label="Approved (all time)" tone="green"
+        {!approver && <Kpi label="Approved (all time)" tone="green"
           icon={<CheckCircle2 size={16} />} value={inr(k.my_approved_amount as string,
             { compact: true })} foot="Reimbursable" />}
       </div>
@@ -230,8 +231,8 @@ export function Home() {
             onPick={(id) => navigate(`/expenses?scope=all${id ? `&department=${id}` : ""}`)} />}</div>
       </div>}
 
-      <div className={can("expense.approve") ? "grid grid-2" : ""}>
-        {can("expense.approve") && (
+      <div className={approver ? "grid grid-2" : ""}>
+        {approver && (
           <div className="card">
             <div className="card-head"><h3>Approval inbox</h3><span className="spacer" />
               <Link to="/approvals" className="small">View all</Link></div>

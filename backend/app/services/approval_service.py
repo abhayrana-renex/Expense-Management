@@ -11,7 +11,7 @@ from app.core.context import get_request_context
 from app.core.deps import Principal
 from app.core.errors import AppError
 from app.core.security import utcnow
-from app.models import ApprovalStep, Expense, ExpenseHistory
+from app.models import ApprovalRule, ApprovalStep, Expense, ExpenseHistory
 from app.schemas.common import money_str
 from app.services import (
     audit_service,
@@ -378,6 +378,28 @@ def route(db: Session, principal: Principal, expense_id: int) -> list[ApprovalSt
         .unique()
         .scalars()
     )
+
+
+def approves(db: Session, principal: Principal) -> bool:
+    """Does this person take part in approvals? Holding the right is not enough (an admin who
+    only raises bills is an initiator): they must be an approver on an active rule, cover for
+    one under a delegation, or have a claim waiting for them on an older route."""
+    if not principal.can("expense.approve"):
+        return False
+    if principal.acting_for:
+        return True
+    uid = principal.user.id
+    on_rule = db.execute(
+        select(ApprovalRule.id)
+        .where(ApprovalRule.approver_id == uid, ApprovalRule.is_active.is_(True))
+        .limit(1)
+    ).first()
+    waiting = db.execute(
+        select(ApprovalStep.id)
+        .where(ApprovalStep.approver_id == uid, ApprovalStep.status.in_(("PENDING", "WAITING")))
+        .limit(1)
+    ).first()
+    return bool(on_rule or waiting)
 
 
 def queue_query(principal: Principal) -> Select:

@@ -34,6 +34,8 @@ export interface Me {
   feature_flags: Record<string, boolean> & { approval_routing?: "band" | "chain" | "matrix" };
   password_policy: { min_length: number; history_count: number; expiry_days: number };
   /** Pre-fill for a new expense (portal defaults, else the user's own). */
+  /** Takes part in approvals; initiators who only raise bills don't see Approvals. */
+  approves?: boolean;
   expense_defaults: { department_id: number | null; branch_id: number | null;
     cost_centre_id: number | null };
 }

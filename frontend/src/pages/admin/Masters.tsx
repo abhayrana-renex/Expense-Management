@@ -1,7 +1,8 @@
 import { Select } from "../../components/Select";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link2, Pencil, Plus, Power } from "lucide-react";
+import { Contact, Link2, Pencil, Plus, Power } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import type { MasterRow } from "../../api/types";
 import { Empty, ErrorAlert, Field, Modal, PageHead, Pagination, Skeleton, errorText,
@@ -48,6 +49,7 @@ const PAGE_SIZE = 25;
 export function Masters() {
   const qc = useQueryClient();
   const toast = useToast();
+  const navigate = useNavigate();
   const [tab, setTab] = useState(0);
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
@@ -100,6 +102,8 @@ export function Masters() {
                 <td>{r.is_active ? <span className="pill pill-green">Active</span>
                   : <span className="pill pill-grey">Inactive</span>}</td>
                 <td className="num"><div className="row" style={{ justifyContent: "flex-end" }}>
+                  {m.key === "vendors" && <button className="btn btn-sm" title="Contacts, bank, GST and contracts"
+                    onClick={() => navigate(`/masters/vendors/${r.id}`)}><Contact size={14} />Details</button>}
                   <button className="btn btn-sm btn-ghost" title="Edit" onClick={() => setEditing(r)}>
                     <Pencil size={14} /></button>
                   <button className="btn btn-sm btn-ghost" title={r.is_active ? "Deactivate" : "Activate"}

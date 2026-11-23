@@ -25,7 +25,7 @@ from app.core.errors import AppError, not_found
 from app.core.security import utcnow
 from app.models import Expense, ExpenseHistory
 from app.schemas.common import money_str
-from app.services import audit_service, engagement_service, expense_rules
+from app.services import audit_service, engagement_service, expense_rules, vendor_bank_service
 from app.services.expense_service import serialize
 from app.services.scope import expense_scope_clause
 
@@ -435,6 +435,16 @@ def payee_of(e: Expense) -> str:
     return names[0] if len(names) == 1 else f"{e.owner.full_name} (reimbursement)"
 
 
+def _vendor_account(db: Session, e: Expense, on: date | None) -> tuple[str, str]:
+    """(account no., IFSC) of the one vendor on the claim, from its APPROVED bank account
+    effective on the value date; blank when there isn't exactly one such account."""
+    vendors = {i.vendor_id for i in e.items}
+    if len(vendors) != 1 or None in vendors:
+        return "", ""
+    acc = vendor_bank_service.active_account(db, vendors.pop(), on or date.today())
+    return (acc.account_no, acc.ifsc) if acc else ("", "")
+
+
 BANK_COLUMNS = [
     "Batch ref",
     "Payment ref",
@@ -474,8 +484,7 @@ def bank_file(
                 e.expense_no,
                 e.payment_scheduled_for.isoformat() if e.payment_scheduled_for else "",
                 payee_of(e),
-                "",  # demo: bank details are not kept in the portal yet
-                "",
+                *_vendor_account(db, e, e.payment_scheduled_for),
                 money_str(e.total_amount),
                 e.payment_mode or "NEFT",
                 f"{e.expense_no} {e.title}"[:60],

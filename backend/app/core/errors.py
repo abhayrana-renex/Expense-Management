@@ -56,6 +56,7 @@ ERROR_CODES: dict[str, str] = {
     "ACCOUNT_LOCKED": "Too many failed logins; try again later",
     "ACCOUNT_INACTIVE": "User is deactivated",
     "CONTRACT_NOT_YOURS": "Contract number is registered by another department",
+    "BANK_CHANGE_PENDING": "A vendor bank change is already waiting for approval",
     "RATE_LIMITED": "Too many requests",
     "PASSWORD_CHANGE_REQUIRED": "User must change password before using the API",
     "PASSWORD_POLICY": "New password does not meet the policy",

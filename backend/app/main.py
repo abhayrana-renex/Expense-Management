@@ -17,6 +17,7 @@ from app.api import (
     roles,
     system,
     users,
+    vendor_master,
 )
 from app.core.config import settings
 from app.core.errors import register_error_handlers
@@ -68,6 +69,7 @@ def create_app() -> FastAPI:
         expenses,
         reports,
         system,
+        vendor_master,
     ):
         api.include_router(module.router)
     app.include_router(api)

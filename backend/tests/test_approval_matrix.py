@@ -81,3 +81,10 @@ def test_process_owner_own_bill_starts_at_hod(api, matrix):
     assert route[0] == ("PO", "SKIPPED")
     assert [c for c, s in route if s != "SKIPPED"] == ["L1", "FIN"]  # nobody added
     assert exp["status"] == "PENDING_L1"
+
+
+def test_only_real_approvers_get_the_approvals_menu(api):
+    # holding the right is not enough: an admin who is on no approval rule is an initiator
+    assert api.get("approver1", "/api/auth/me").json()["approves"] is True
+    assert api.get("finadmin", "/api/auth/me").json()["approves"] is False
+    assert api.get("user1", "/api/auth/me").json()["approves"] is False

@@ -69,6 +69,11 @@ class MeOut(BaseModel):
         "(DEFAULT_DEPARTMENT / DEFAULT_BRANCH, else the user's own; the cost centre linked "
         "to that department). The user can change each one."
     )
+    approves: bool = Field(
+        False,
+        description="Takes part in approvals (approver on an active rule, covering for one, or "
+        "a claim waiting for them). Initiators who only raise bills: false - no Approvals menu.",
+    )
 
 
 class UserCreate(BaseModel):

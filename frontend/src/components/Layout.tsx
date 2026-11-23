@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Banknote, BarChart3, CheckSquare, ChevronDown, Database, FileText, Home, KeyRound, KeySquare,
-  LogOut, Menu, Plus,
+  Landmark, LogOut, Menu, Plus,
   Receipt, Search, ShieldCheck, SlidersHorizontal, Users, X,
 } from "lucide-react";
 import { api } from "../api/client";
@@ -23,10 +23,18 @@ export function Layout() {
   useEffect(() => { setNav(false); }, [location.pathname]);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Approvals only for people who take part in them, not initiators who just raise bills.
+  const approver = can("expense.approve") && me?.approves !== false;
+  const bankQueue = useQuery({
+    queryKey: ["bank-approvals"],
+    queryFn: () => api.get<unknown[]>("/masters/vendor-bank-accounts/pending"),
+    enabled: can("vendor_bank.approve"),
+    refetchInterval: 120_000,
+  });
   const queue = useQuery({
     queryKey: ["queue-count"],
     queryFn: () => api.page<ExpenseSummary>("/approvals/queue", { page_size: 1 }),
-    enabled: can("expense.approve"),
+    enabled: approver,
     refetchInterval: 60_000,
   });
 
@@ -39,7 +47,8 @@ export function Layout() {
   }, []);
 
   if (!me) return null;
-  const isAdmin = can("user.manage") || can("master.manage") || can("audit.read");
+  const isAdmin = can("user.manage") || can("master.manage") || can("audit.read")
+    || can("vendor_bank.approve");
 
   return (
     <div className={`shell ${nav ? "nav-open" : ""}`}>
@@ -56,7 +65,7 @@ export function Layout() {
         </div>
         <NavLink to="/" end className="nav-link"><Home size={16} />Home</NavLink>
         <NavLink to="/expenses" className="nav-link"><Receipt size={16} />Expenses</NavLink>
-        {can("expense.approve") && (
+        {approver && (
           <NavLink to="/approvals" className="nav-link">
             <CheckSquare size={16} />Approvals
             {(queue.data?.total ?? 0) > 0 && <span className="nav-badge">{queue.data!.total}</span>}
@@ -78,6 +87,12 @@ export function Layout() {
         )}
         {can("master.manage") && (
           <NavLink to="/admin/masters" className="nav-link"><Database size={16} />Master data</NavLink>
+        )}
+        {can("vendor_bank.approve") && (
+          <NavLink to="/admin/bank-approvals" className="nav-link"><Landmark size={16} />
+            Bank approvals
+            {(bankQueue.data?.length ?? 0) > 0 && <span className="nav-badge">{bankQueue.data!.length}</span>}
+          </NavLink>
         )}
         {can("approval_rule.manage") && (
           <NavLink to="/admin/rules" className="nav-link">

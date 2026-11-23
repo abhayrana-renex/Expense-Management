@@ -26,6 +26,12 @@ from app.models.masters import (
 )
 from app.models.rbac import Permission, Role, RolePermission
 from app.models.user import AuthSession, PasswordHistory, User
+from app.models.vendor_master import (
+    VendorBankAccount,
+    VendorContact,
+    VendorContract,
+    VendorGstRegistration,
+)
 
 __all__ = [
     "Assignee",
@@ -60,4 +66,8 @@ __all__ = [
     "Role",
     "RolePermission",
     "User",
+    "VendorBankAccount",
+    "VendorContact",
+    "VendorContract",
+    "VendorGstRegistration",
 ]

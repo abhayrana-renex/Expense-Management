@@ -68,6 +68,21 @@ ROLES: dict[str, tuple[str, dict[str, str]]] = {
             "ledger.export": "ALL",
         },
     ),
+    # HOD (L1) and CFO (L2): approve bills of every department, so they see the whole
+    # company dashboard (spend charts and spend by department), but only open the claims
+    # routed to them.
+    "HOD_CFO": (
+        "HOD / CFO approver",
+        {
+            "expense.create": "OWN",
+            "expense.read": "ASSIGNED",
+            "expense.approve": "ASSIGNED",
+            "report.read": "ALL",
+            "report.export": "ALL",
+            "report.department_spend": "ALL",
+            "master.read": "ALL",
+        },
+    ),
     "FA_CHECK": (
         "F&A ratification",
         {
@@ -102,6 +117,7 @@ ROLES: dict[str, tuple[str, dict[str, str]]] = {
             "payment.schedule": "ALL",
             "payment.record": "ALL",
             "ledger.export": "ALL",
+            "vendor_bank.approve": "ALL",
             "report.read": "ALL",
             "report.department_spend": "ALL",
             "report.export": "ALL",
@@ -111,9 +127,23 @@ ROLES: dict[str, tuple[str, dict[str, str]]] = {
 }
 ROLES["SUPER_ADMIN"] = (
     "Super Administrator",
-    {**ROLES["ADMIN"][1], "role.manage": "ALL", "report.department_spend": "ALL"},
+    {
+        **ROLES["ADMIN"][1],
+        "role.manage": "ALL",
+        "report.department_spend": "ALL",
+        "vendor_bank.approve": "ALL",
+    },
 )
-SYSTEM_ROLES = {"USER", "APPROVER", "ADMIN", "FINANCE", "SUPER_ADMIN", "FA_CHECK", "MD"}
+SYSTEM_ROLES = {
+    "USER",
+    "APPROVER",
+    "HOD_CFO",
+    "ADMIN",
+    "FINANCE",
+    "SUPER_ADMIN",
+    "FA_CHECK",
+    "MD",
+}
 # GST rate options for CGST / SGST / IGST (owner's list). Admins can add/deactivate rates.
 GST_RATES = ["3", "5", "7", "9", "12", "15", "18"]
 
