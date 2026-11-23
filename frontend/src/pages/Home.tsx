@@ -54,7 +54,7 @@ function MonthBars({ data }: { data: Dashboard["series"]["by_month"] }) {
   const max = Math.max(...data.map((d) => Number(d.amount)), 1);
   return (
     <div className="bars">
-      {data.map((d) => {
+      {data.map((d, i) => {
         const total = Number(d.amount);
         const approved = Number(d.approved_amount);
         const label = new Date(`${d.month}T00:00:00`).toLocaleDateString("en-IN",
@@ -62,7 +62,8 @@ function MonthBars({ data }: { data: Dashboard["series"]["by_month"] }) {
         return (
           <div key={d.month} className="bar-col" title={spendTip(label, d.amount, d.approved_amount)}>
             <span className="small amount">{inr(d.amount, { compact: true })}</span>
-            <div className="bar" style={{ height: `${(total / max) * 100}%` }}>
+            <div className="bar" style={{ height: `${(total / max) * 100}%`,
+              animationDelay: `${i * 80}ms` }}>
               <span style={{ height: `${total ? (approved / total) * 100 : 0}%` }} />
             </div>
             <span className="bar-label">{label}</span>
@@ -109,29 +110,39 @@ function DepartmentPie({ data, onPick }: { data: DeptRow[]; onPick: (id: number 
   return (
     <div className="dept-pie">
       <svg viewBox="0 0 160 160" role="img" aria-label="Spend by department">
+        {/* Draws itself clockwise each time Home opens. */}
+        <defs><mask id="pie-sweep">
+          <circle cx={C} cy={C} r={(R + r) / 2} fill="none" stroke="#fff" strokeWidth={R - r + 8}
+            pathLength={100} className="pie-sweep" transform={`rotate(-90 ${C} ${C})`} />
+        </mask></defs>
+        <g mask="url(#pie-sweep)">
         {slices.map((x) => {
           const share = x.amount / total;
           const a0 = angle;
           const a1 = angle + Math.max(share * 2 * Math.PI, 0.0001);
           angle = a1;
+          const mid = (a0 + a1) / 2; // a hovered slice lifts out along its middle
+          const lift = { "--dx": `${(Math.cos(mid) * 5).toFixed(2)}px`,
+            "--dy": `${(Math.sin(mid) * 5).toFixed(2)}px` } as React.CSSProperties;
           const d = share >= 0.9999
             ? `M ${C} ${C - R} A ${R} ${R} 0 1 1 ${C - 0.01} ${C - R} L ${C - 0.01} ${C - r} A ${r} ${r} 0 1 0 ${C} ${C - r} Z`
             : arc(a0, a1);
           return (
-            <path key={x.label} d={d} fill={x.color} className="pie-slice" tabIndex={0}
+            <path key={x.label} d={d} fill={x.color} className="pie-slice" tabIndex={0} style={lift}
               role="button" aria-label={tip(x)} onClick={() => onPick(x.id)}
               onKeyDown={(ev) => (ev.key === "Enter" || ev.key === " ") && onPick(x.id)}>
               <title>{tip(x)}</title>
             </path>
           );
         })}
+        </g>
         <text x={C} y={C - 2} textAnchor="middle" className="pie-total">
           {inr(total.toFixed(2), { compact: true })}</text>
         <text x={C} y={C + 13} textAnchor="middle" className="pie-sub">submitted</text>
       </svg>
       <ul className="pie-legend">
-        {slices.map((x) => (
-          <li key={x.label}>
+        {slices.map((x, i) => (
+          <li key={x.label} className="pie-li" style={{ animationDelay: `${300 + i * 70}ms` }}>
             <button type="button" className="pie-row" title={tip(x)} onClick={() => onPick(x.id)}>
               <span className="pie-swatch" style={{ background: x.color }} />
               <span className="pie-name">{x.label}</span>
@@ -195,6 +206,14 @@ export function Home() {
 
       {(showSpend || showDepartments) && <div className={`charts-row n${
         (showSpend ? 2 : 0) + (showDepartments ? 1 : 0)}`}>
+        {showDepartments && <div className="card">
+          <div className="card-head"><h3>Spend by department</h3>
+            <span className="sub" title="Submitted, not cancelled. Click a slice or a row to open that department's expenses.">
+              All time · click to open</span></div>
+          <div className="card-body">{dash.isLoading ? <Skeleton rows={4} />
+            : <DepartmentPie data={dash.data?.series.by_department ?? []}
+              onPick={(id) => navigate(`/expenses?scope=all${id ? `&department=${id}` : ""}`)} />}</div>
+        </div>}
         {showSpend && <div className="card">
           <div className="card-head"><h3>Spend over time</h3>
             <span className="sub" title={dash.data?.scope === "ALL" ? "Whole company"
@@ -214,18 +233,11 @@ export function Home() {
                   <span style={{ fontWeight: 500 }}>{c.label}</span><span className="spacer" />
                   <span className="amount">{inr(c.amount, { compact: true })}</span>
                 </div>
-                <div className="hbar"><span style={{ width: `${(Number(c.amount) / catMax) * 100}%` }} /></div>
+                <div className="hbar"><span style={{ width: `${(Number(c.amount) / catMax) * 100}%`,
+                  animationDelay: `${cats.indexOf(c) * 90}ms` }} /></div>
               </div>
             ))}
           </div>
-        </div>}
-        {showDepartments && <div className="card">
-          <div className="card-head"><h3>Spend by department</h3>
-            <span className="sub" title="Submitted, not cancelled. Click a slice or a row to open that department's expenses.">
-              All time · click to open</span></div>
-          <div className="card-body">{dash.isLoading ? <Skeleton rows={4} />
-            : <DepartmentPie data={dash.data?.series.by_department ?? []}
-              onPick={(id) => navigate(`/expenses?scope=all${id ? `&department=${id}` : ""}`)} />}</div>
         </div>}
       </div>}
 

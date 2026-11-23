@@ -845,7 +845,7 @@ kbd { font-family: inherit; font-size: 10px; font-weight: 600; color: var(--ink-
 /* Home: the spend charts side by side in one row of equal-height cards.
    n3 = spend over time | top categories | spend by department; n2 = the first two. */
 .charts-row { display: grid; gap: 14px; margin-bottom: 12px; align-items: stretch; }
-.charts-row.n3 { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr); }
+.charts-row.n3 { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1fr); }
 .charts-row.n2 { grid-template-columns: minmax(0, 1fr) 320px; }
 .charts-row.n1 { grid-template-columns: minmax(0, 1fr); }
 .charts-row > .card { min-width: 0; }
@@ -856,7 +856,7 @@ kbd { font-family: inherit; font-size: 10px; font-weight: 600; color: var(--ink-
 .charts-row.n3 .pie-row { padding: 5px 6px; grid-template-columns: 12px minmax(0, 1fr) 36px 64px; gap: 8px; }
 @media (max-width: 1250px) {
   .charts-row.n3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .charts-row.n3 > .card:last-child { grid-column: 1 / -1; }
+  .charts-row.n3 > .card:first-child { grid-column: 1 / -1; }
   .charts-row.n3 .dept-pie { grid-template-columns: 180px minmax(0, 1fr); justify-items: stretch; }
   .charts-row.n3 .dept-pie svg { width: 180px; height: 180px; }
   .charts-row.n3 .pie-legend { max-width: 620px; }
@@ -874,3 +874,26 @@ kbd { font-family: inherit; font-size: 10px; font-weight: 600; color: var(--ink-
 .charts-row > .card { display: flex; flex-direction: column; }
 .charts-row > .card > .card-body { flex: 1; display: flex; flex-direction: column; }
 .charts-row .bars { flex: 1; height: auto; min-height: 150px; }
+
+/* Home charts come alive each time Home opens: the donut draws itself round, slices lift out
+   on hover, bars rise one after another, category bars slide in, list rows fade in. */
+.pie-sweep { stroke-dasharray: 100; stroke-dashoffset: 100;
+  animation: pie-sweep 1s cubic-bezier(0.65, 0, 0.35, 1) 0.1s forwards; }
+@keyframes pie-sweep { to { stroke-dashoffset: 0; } }
+.dept-pie svg { animation: pie-turn 1.1s cubic-bezier(0.22, 1, 0.36, 1) both; overflow: visible; }
+@keyframes pie-turn { from { transform: rotate(-35deg) scale(0.86); opacity: 0.2; }
+  to { transform: none; opacity: 1; } }
+.pie-slice { transition: transform 0.18s ease, opacity 0.12s; transform-box: view-box; }
+.pie-slice:hover, .pie-slice:focus-visible { transform: translate(var(--dx), var(--dy)); }
+.pie-total, .pie-sub { animation: fade-up 0.5s ease 0.6s both; }
+.pie-li { animation: fade-up 0.45s ease both; }
+.bar { transform-origin: bottom; animation: bar-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes bar-rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.hbar > span { transform-origin: left; animation: bar-fill 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes bar-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .pie-sweep { animation: none; stroke-dashoffset: 0; }
+  .dept-pie svg, .pie-total, .pie-sub, .pie-li, .bar, .hbar > span { animation: none; }
+  .pie-slice { transition: none; }
+}
