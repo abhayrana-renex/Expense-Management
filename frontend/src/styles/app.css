@@ -841,3 +841,36 @@ kbd { font-family: inherit; font-size: 10px; font-weight: 600; color: var(--ink-
 .contact-tbl td:first-child { width: 170px; white-space: nowrap; }
 .contact-tbl .input { min-width: 140px; }
 @media (max-width: 900px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Home: the spend charts side by side in one row of equal-height cards.
+   n3 = spend over time | top categories | spend by department; n2 = the first two. */
+.charts-row { display: grid; gap: 14px; margin-bottom: 12px; align-items: stretch; }
+.charts-row.n3 { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr); }
+.charts-row.n2 { grid-template-columns: minmax(0, 1fr) 320px; }
+.charts-row.n1 { grid-template-columns: minmax(0, 1fr); }
+.charts-row > .card { min-width: 0; }
+/* In a third of the row the donut sits above its list. */
+.charts-row.n3 .dept-pie { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 12px; }
+.charts-row.n3 .dept-pie svg { width: 150px; height: 150px; }
+.charts-row.n3 .pie-legend { width: 100%; max-width: none; }
+.charts-row.n3 .pie-row { padding: 5px 6px; grid-template-columns: 12px minmax(0, 1fr) 36px 64px; gap: 8px; }
+@media (max-width: 1250px) {
+  .charts-row.n3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .charts-row.n3 > .card:last-child { grid-column: 1 / -1; }
+  .charts-row.n3 .dept-pie { grid-template-columns: 180px minmax(0, 1fr); justify-items: stretch; }
+  .charts-row.n3 .dept-pie svg { width: 180px; height: 180px; }
+  .charts-row.n3 .pie-legend { max-width: 620px; }
+}
+@media (max-width: 1100px) { .charts-row.n2 { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .charts-row.n3 { grid-template-columns: minmax(0, 1fr); }
+  .charts-row.n3 .dept-pie { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+}
+/* One-line card titles across the row, and charts that use the card's full height. */
+.charts-row .card-head { flex-wrap: nowrap; min-height: 44px; }
+.charts-row .card-head h3 { white-space: nowrap; }
+.charts-row .card-head .sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.charts-row .card-head .row { flex: none; }
+.charts-row > .card { display: flex; flex-direction: column; }
+.charts-row > .card > .card-body { flex: 1; display: flex; flex-direction: column; }
+.charts-row .bars { flex: 1; height: auto; min-height: 150px; }

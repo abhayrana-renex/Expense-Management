@@ -193,19 +193,20 @@ export function Home() {
             { compact: true })} foot="Reimbursable" />}
       </div>
 
-      {showSpend && <div className="split" style={{ marginBottom: 12 }}>
-        <div className="card">
+      {(showSpend || showDepartments) && <div className={`charts-row n${
+        (showSpend ? 2 : 0) + (showDepartments ? 1 : 0)}`}>
+        {showSpend && <div className="card">
           <div className="card-head"><h3>Spend over time</h3>
-            <span className="sub">Last 6 months · {dash.data?.scope === "ALL" ? "Company"
-              : dash.data?.scope === "OWN" ? "Your expenses" : "Your scope"}</span>
+            <span className="sub" title={dash.data?.scope === "ALL" ? "Whole company"
+              : dash.data?.scope === "OWN" ? "Your expenses" : "Your scope"}>6 months</span>
             <span className="spacer" />
             <SpendLegend /></div>
           <div className="card-body"><SpendNote />{dash.isLoading ? <Skeleton rows={4} />
             : <MonthBars data={dash.data?.series.by_month ?? []} />}</div>
-        </div>
-        <div className="card">
+        </div>}
+        {showSpend && <div className="card">
           <div className="card-head"><h3>Top categories</h3></div>
-          <div className="card-body" style={{ display: "grid", gap: 10 }}>
+          <div className="card-body" style={{ display: "grid", gap: 10, alignContent: "start" }}>
             {cats.length === 0 && <span className="muted small">No data yet.</span>}
             {cats.slice(0, 6).map((c) => (
               <div key={c.label}>
@@ -217,18 +218,15 @@ export function Home() {
               </div>
             ))}
           </div>
-        </div>
-      </div>}
-
-      {showDepartments && <div className="card" style={{ marginBottom: 12 }}>
-        <div className="card-head"><h3>Spend by department</h3>
-          <span className="sub">{dash.data?.scope === "ALL" ? "Company" : dash.data?.scope === "OWN"
-            ? "Your expenses" : "Your scope"} · submitted, not cancelled, all time</span>
-          <span className="spacer" />
-          <span className="small muted">Click a slice to open its expenses</span></div>
-        <div className="card-body">{dash.isLoading ? <Skeleton rows={4} />
-          : <DepartmentPie data={dash.data?.series.by_department ?? []}
-            onPick={(id) => navigate(`/expenses?scope=all${id ? `&department=${id}` : ""}`)} />}</div>
+        </div>}
+        {showDepartments && <div className="card">
+          <div className="card-head"><h3>Spend by department</h3>
+            <span className="sub" title="Submitted, not cancelled. Click a slice or a row to open that department's expenses.">
+              All time · click to open</span></div>
+          <div className="card-body">{dash.isLoading ? <Skeleton rows={4} />
+            : <DepartmentPie data={dash.data?.series.by_department ?? []}
+              onPick={(id) => navigate(`/expenses?scope=all${id ? `&department=${id}` : ""}`)} />}</div>
+        </div>}
       </div>}
 
       <div className={approver ? "grid grid-2" : ""}>
