@@ -1,4 +1,4 @@
-"""AP process flow: L1 -> L2 -> F&A ratification (can correct) -> MD above the limit,
+"""Chain routing: PO -> L1 -> L2 -> L3 above the limit, send back to anyone earlier,
 push back one step, duplicate invoices per company, and PO / ad-hoc / contract bills."""
 
 import uuid
@@ -16,7 +16,7 @@ GSTIN_B = "29AAACB1234C1Z5"
 
 @pytest.fixture()
 def chain(db, monkeypatch):
-    """user1's department: L1 approver1 -> L2 approver2 -> L3 finadmin -> MD approver3 >50k."""
+    """user1's department: PO approver1 -> L1 approver2 -> L2 finadmin -> L3 approver3 >50k."""
     from app.core.config import settings
 
     monkeypatch.setattr(settings, "APPROVAL_ROUTING", "chain")
@@ -30,10 +30,10 @@ def chain(db, monkeypatch):
     ):
         rule.is_active = False
     for code, who, above in (
-        ("L1", "approver1", "0"),
-        ("L2", "approver2", "0"),
-        ("L3", "finadmin", "0"),
-        ("MD", "approver3", "50000"),
+        ("PO", "approver1", "0"),
+        ("L1", "approver2", "0"),
+        ("L2", "finadmin", "0"),
+        ("L3", "approver3", "50000"),
     ):
         db.add(
             ApprovalRule(
@@ -58,11 +58,11 @@ def route(api, exp_id):
 
 def test_small_claim_goes_l1_l2_finance_then_payment(api, chain):
     exp = api.new_expense("user1", ["30000.00"], submit=True)
-    assert exp["status"] == "PENDING_L1"
-    assert [c for c, _ in route(api, exp["id"])] == ["L1", "L2", "L3"]
+    assert exp["status"] == "PENDING_PO"
+    assert [c for c, _ in route(api, exp["id"])] == ["PO", "L1", "L2"]
     for who, nxt in (
-        ("approver1", "PENDING_L2"),
-        ("approver2", "PENDING_L3"),
+        ("approver1", "PENDING_L1"),
+        ("approver2", "PENDING_L2"),
         ("finadmin", "APPROVED"),
     ):
         r = api.act(who, exp["id"], "approve")
@@ -73,7 +73,7 @@ def test_small_claim_goes_l1_l2_finance_then_payment(api, chain):
 
 def test_above_limit_goes_to_md(api, chain):
     exp = api.new_expense("user1", ["60000.00"], submit=True)
-    assert [c for c, _ in route(api, exp["id"])] == ["L1", "L2", "L3", "MD"]
+    assert [c for c, _ in route(api, exp["id"])] == ["PO", "L1", "L2", "L3"]
 
 
 def test_send_back_goes_one_step_and_never_cancels(api, chain):
@@ -82,30 +82,30 @@ def test_send_back_goes_one_step_and_never_cancels(api, chain):
     api.act("approver2", exp["id"], "approve")
     allowed = api.get("finadmin", f"/api/expenses/{exp['id']}/allowed-actions").json()
     assert allowed["send_back"] and "correct" not in allowed
-    assert allowed["send_back_to"].endswith("(L2)")
-    assert [t["level"] for t in allowed["send_back_targets"]] == [None, "L1", "L2"]
+    assert allowed["send_back_to"].endswith("(L1)")
+    assert [t["level"] for t in allowed["send_back_targets"]] == [None, "PO", "L1"]
 
     r = api.act("finadmin", exp["id"], "send_back", comment="Check the vendor name")
     assert r.status_code == 200, r.text
-    assert r.json()["status"] == "PENDING_L2"
+    assert r.json()["status"] == "PENDING_L1"
     assert r.json()["current_approver"]["full_name"] == "Demo Approver L2"
     tracker = api.get("user1", f"/api/expenses/{exp['id']}/tracker").json()
     current = next(s for s in tracker["stages"] if s["state"] == "current")
-    assert current["label"] == "L2 approval" and "Sent back by" in current["note"]
+    assert current["label"] == "L1 approval" and "Sent back by" in current["note"]
     assert current["comment"] == "Check the vendor name"
 
-    # L2 sends back again -> L1; L1 sends back -> employee (RETURNED, not cancelled)
+    # L1 sends back again -> PO; PO sends back -> employee (RETURNED, not cancelled)
     assert (
-        api.act("approver2", exp["id"], "send_back", comment="Over to L1").json()["status"]
-        == "PENDING_L1"
+        api.act("approver2", exp["id"], "send_back", comment="Over to PO").json()["status"]
+        == "PENDING_PO"
     )
     back = api.act("approver1", exp["id"], "send_back", comment="Please fix the bill").json()
     assert back["status"] == "RETURNED"
     notes = api.get("user1", "/api/notifications").json()
     assert any(n["kind"] == "RETURNED" for n in notes)
-    # the employee can resubmit and the chain starts again from L1
+    # the employee can resubmit and the chain starts again from PO
     again = api.post("user1", f"/api/expenses/{exp['id']}/submit").json()
-    assert again["status"] == "PENDING_L1"
+    assert again["status"] == "PENDING_PO"
 
 
 def test_send_back_to_any_earlier_person(api, chain):
@@ -115,25 +115,25 @@ def test_send_back_to_any_earlier_person(api, chain):
     targets = api.get("finadmin", f"/api/expenses/{exp['id']}/allowed-actions").json()[
         "send_back_targets"
     ]
-    l1 = next(t for t in targets if t["level"] == "L1")
-    # Finance asks L1 a question directly, skipping L2; L2 must approve again afterwards
+    l1 = next(t for t in targets if t["level"] == "PO")
+    # Finance asks PO a question directly, skipping L1; L1 must approve again afterwards
     r = api.act("finadmin", exp["id"], "send_back", comment="Why this vendor?", to=l1["to"])
     assert r.status_code == 200, r.text
-    assert r.json()["status"] == "PENDING_L1"
-    assert ("L2", "WAITING") in route(api, exp["id"])
-    assert api.act("approver1", exp["id"], "approve").json()["status"] == "PENDING_L2"
-    assert api.act("approver2", exp["id"], "approve").json()["status"] == "PENDING_L3"
+    assert r.json()["status"] == "PENDING_PO"
+    assert ("L1", "WAITING") in route(api, exp["id"])
+    assert api.act("approver1", exp["id"], "approve").json()["status"] == "PENDING_L1"
+    assert api.act("approver2", exp["id"], "approve").json()["status"] == "PENDING_L2"
 
     # someone who has not approved yet is not a valid target
     md_like = api.act("finadmin", exp["id"], "send_back", comment="x" * 5, to="999999")
     assert md_like.status_code == 422
 
-    # straight to the initiator to rewrite the bill; resubmit starts again from L1
+    # straight to the initiator to rewrite the bill; resubmit starts again from PO
     back = api.act("finadmin", exp["id"], "send_back", comment="Rewrite the bill", to="owner")
     assert back.json()["status"] == "RETURNED"
     assert api.get("user1", f"/api/expenses/{exp['id']}/allowed-actions").json()["edit"]
     again = api.post("user1", f"/api/expenses/{exp['id']}/submit").json()
-    assert again["status"] == "PENDING_L1"
+    assert again["status"] == "PENDING_PO"
 
 
 def test_approvers_cannot_edit_the_bill(api, chain):

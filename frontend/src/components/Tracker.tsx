@@ -12,7 +12,7 @@ const ICON: Record<TrackerStage["state"], JSX.Element> = {
   failed: <X size={14} strokeWidth={3} />,
 };
 
-/** Order-style tracker: Submitted -> L1 -> L2 -> L3 -> Approved -> Payment -> Paid. */
+/** Order-style tracker: Submitted -> each approval level -> Approved -> Payment -> Paid. */
 export function Tracker({ expenseId, compact }: { expenseId: number; compact?: boolean }) {
   const q = useQuery({ queryKey: ["expense", String(expenseId), "tracker"],
     queryFn: () => api.get<TrackerData>(`/expenses/${expenseId}/tracker`) });

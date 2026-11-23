@@ -84,6 +84,7 @@ def me(
         "feature_flags": {
             "totp_2fa": settings.FEATURE_TOTP_2FA,
             "enforce_gst_rules": settings.ENFORCE_GST_RULES,
+            "approval_routing": settings.APPROVAL_ROUTING,
         },
         "password_policy": {
             "min_length": settings.PASSWORD_MIN_LENGTH,

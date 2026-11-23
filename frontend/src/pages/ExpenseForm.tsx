@@ -797,8 +797,8 @@ export function ExpenseForm() {
               </li>
             ))}
           </ol>
-          <p className="small muted" style={{ marginBottom: 0 }}>Anyone in the chain can send it one
-            step back to fix something - it is never cancelled. Follow it on the expense page.</p>
+          <p className="small muted" style={{ marginBottom: 0 }}>Any approver can send it back to you to
+            fix the bill, or ask in the discussion - it is never cancelled. Follow it on the expense page.</p>
         </Modal>
       )}
     </>

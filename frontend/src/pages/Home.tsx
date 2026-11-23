@@ -73,29 +73,74 @@ function MonthBars({ data }: { data: Dashboard["series"]["by_month"] }) {
   );
 }
 
-/** Department-wise spend: one bar per department, approved part darker. */
-function DepartmentBars({ data }: { data: NonNullable<Dashboard["series"]["by_department"]> }) {
+/** Slice colours: a fixed categorical order (validated for colour-blind separation), the
+ *  tail folded into a grey "Other". Colour follows the department's rank by spend. */
+const SLICE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"];
+const OTHER = "#a3a29b";
+
+type DeptRow = NonNullable<Dashboard["series"]["by_department"]>[number];
+
+/** Spend by department as a donut. Click a slice (or its row) to open that department's
+ *  expenses; "Other" opens everything. The list beside it carries the names and figures. */
+function DepartmentPie({ data, onPick }: { data: DeptRow[]; onPick: (id: number | null) => void }) {
   if (!data.length) return <Empty title="No spend yet" text="Submitted expenses appear here by department." />;
-  const max = Math.max(...data.map((d) => Number(d.amount)), 1);
+  const top = data.slice(0, SLICE.length);
+  const rest = data.slice(SLICE.length);
+  const sum = (rows: DeptRow[], k: "amount" | "approved_amount") =>
+    rows.reduce((t, r) => t + Number(r[k]), 0);
+  const slices = [
+    ...top.map((d, i) => ({ id: d.id as number | null, label: d.label, amount: Number(d.amount),
+      approved: Number(d.approved_amount), count: d.count, color: SLICE[i]! })),
+    ...(rest.length ? [{ id: null, label: `Other (${rest.length} departments)`,
+      amount: sum(rest, "amount"), approved: sum(rest, "approved_amount"),
+      count: rest.reduce((t, r) => t + r.count, 0), color: OTHER }] : []),
+  ];
+  const total = slices.reduce((t, x) => t + x.amount, 0) || 1;
+  const R = 70, r = 44, C = 80; // outer / inner radius, centre
+  let angle = -Math.PI / 2;
+  const arc = (a0: number, a1: number) => {
+    const p = (rad: number, a: number) => `${C + rad * Math.cos(a)} ${C + rad * Math.sin(a)}`;
+    const big = a1 - a0 > Math.PI ? 1 : 0;
+    return `M ${p(R, a0)} A ${R} ${R} 0 ${big} 1 ${p(R, a1)} L ${p(r, a1)} A ${r} ${r} 0 ${big} 0 ${p(r, a0)} Z`;
+  };
+  const tip = (x: (typeof slices)[number]) =>
+    `${spendTip(x.label, x.amount.toFixed(2), x.approved.toFixed(2))} · ${x.count} claim(s) · `
+    + `${((x.amount / total) * 100).toFixed(1)}% - click to open`;
   return (
-    <div className="dept-bars" role="list">
-      {data.map((d) => {
-        const total = Number(d.amount);
-        const approved = Number(d.approved_amount);
-        return (
-          <div key={d.label} className="dept-row" role="listitem"
-            title={`${spendTip(d.label, d.amount, d.approved_amount)} · ${d.count} claim(s)`}>
-            <span className="dept-name">{d.label}</span>
-            <div className="dept-track">
-              <div className="dept-bar" style={{ width: `${(total / max) * 100}%` }}>
-                <span style={{ width: `${total ? (approved / total) * 100 : 0}%` }} />
-              </div>
-            </div>
-            <span className="dept-amt amount">{inr(d.amount, { compact: true })}
-              <span className="cell-sub"> · {d.count}</span></span>
-          </div>
-        );
-      })}
+    <div className="dept-pie">
+      <svg viewBox="0 0 160 160" role="img" aria-label="Spend by department">
+        {slices.map((x) => {
+          const share = x.amount / total;
+          const a0 = angle;
+          const a1 = angle + Math.max(share * 2 * Math.PI, 0.0001);
+          angle = a1;
+          const d = share >= 0.9999
+            ? `M ${C} ${C - R} A ${R} ${R} 0 1 1 ${C - 0.01} ${C - R} L ${C - 0.01} ${C - r} A ${r} ${r} 0 1 0 ${C} ${C - r} Z`
+            : arc(a0, a1);
+          return (
+            <path key={x.label} d={d} fill={x.color} className="pie-slice" tabIndex={0}
+              role="button" aria-label={tip(x)} onClick={() => onPick(x.id)}
+              onKeyDown={(ev) => (ev.key === "Enter" || ev.key === " ") && onPick(x.id)}>
+              <title>{tip(x)}</title>
+            </path>
+          );
+        })}
+        <text x={C} y={C - 2} textAnchor="middle" className="pie-total">
+          {inr(total.toFixed(2), { compact: true })}</text>
+        <text x={C} y={C + 13} textAnchor="middle" className="pie-sub">submitted</text>
+      </svg>
+      <ul className="pie-legend">
+        {slices.map((x) => (
+          <li key={x.label}>
+            <button type="button" className="pie-row" title={tip(x)} onClick={() => onPick(x.id)}>
+              <span className="pie-swatch" style={{ background: x.color }} />
+              <span className="pie-name">{x.label}</span>
+              <span className="pie-pct muted">{((x.amount / total) * 100).toFixed(0)}%</span>
+              <span className="amount">{inr(x.amount.toFixed(2), { compact: true })}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -177,11 +222,12 @@ export function Home() {
       {showDepartments && <div className="card" style={{ marginBottom: 12 }}>
         <div className="card-head"><h3>Spend by department</h3>
           <span className="sub">{dash.data?.scope === "ALL" ? "Company" : dash.data?.scope === "OWN"
-            ? "Your expenses" : "Your scope"} · submitted, not cancelled</span>
+            ? "Your expenses" : "Your scope"} · submitted, not cancelled, all time</span>
           <span className="spacer" />
-          <SpendLegend /></div>
-        <div className="card-body"><SpendNote />{dash.isLoading ? <Skeleton rows={4} />
-          : <DepartmentBars data={dash.data?.series.by_department ?? []} />}</div>
+          <span className="small muted">Click a slice to open its expenses</span></div>
+        <div className="card-body">{dash.isLoading ? <Skeleton rows={4} />
+          : <DepartmentPie data={dash.data?.series.by_department ?? []}
+            onPick={(id) => navigate(`/expenses?scope=all${id ? `&department=${id}` : ""}`)} />}</div>
       </div>}
 
       <div className={can("expense.approve") ? "grid grid-2" : ""}>

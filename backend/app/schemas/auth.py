@@ -62,7 +62,7 @@ class MeOut(BaseModel):
     permissions: dict[str, str] = Field(description="permission code -> data scope")
     must_change_password: bool
     password_expired: bool
-    feature_flags: dict[str, bool]
+    feature_flags: dict[str, bool | str]  # flags, plus approval_routing (band/chain/matrix)
     password_policy: dict[str, int]
     expense_defaults: dict[str, int | None] = Field(
         description="Pre-fill for a new expense: department_id, branch_id, cost_centre_id "

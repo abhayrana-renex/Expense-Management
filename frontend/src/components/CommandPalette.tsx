@@ -18,7 +18,7 @@ const PAGES: { label: string; to: string; permission?: string; words: string }[]
   { label: "Users", to: "/admin/users", permission: "user.manage", words: "people employees logins" },
   { label: "Roles & rights", to: "/admin/roles", permission: "user.manage", words: "permissions access" },
   { label: "Master data", to: "/admin/masters", permission: "master.manage", words: "vendors branches departments gst" },
-  { label: "Approval policies", to: "/admin/rules", permission: "approval_rule.manage", words: "rules limits bands l1 l2 l3" },
+  { label: "Approval policies", to: "/admin/rules", permission: "approval_rule.manage", words: "rules limits matrix process owner hod cfo md finance" },
   { label: "Audit log", to: "/admin/audit", permission: "audit.read", words: "history trail" },
   { label: "Change password", to: "/account/password", words: "password security" },
 ];

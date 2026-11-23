@@ -1,20 +1,83 @@
 {
   "_comment": "Example only (fictional people). Copy to org_setup.local.json (gitignored) and put your real FAR employee codes there.",
-  "md_above": "50000.00",
   "people": [
-    {"username": "emp_it", "employee_code": "EMP1042", "role": "USER", "name": "Sneha Kulkarni", "note": "IT employee"},
-    {"username": "emp_fin", "employee_code": "EMP1108", "role": "USER", "name": "Arjun Singh", "note": "Finance employee"},
-    {"username": "l1_owner", "employee_code": "EMP1201", "role": "APPROVER", "name": "Rahul Mehta", "note": "L1 process owner"},
-    {"username": "l2_hod", "employee_code": "EMP1302", "role": "APPROVER", "name": "Priya Sharma", "note": "L2 HOD"},
-    {"username": "l3_fa", "employee_code": "EMP1403", "role": "FA_CHECK", "name": "Kiran Rao", "note": "L3 F&A ratification"},
-    {"username": "finance", "employee_code": "EMP1504", "role": "FINANCE", "name": "Neha Gupta", "note": "payment schedule, bank file, UTR, GL"},
-    {"username": "md", "employee_code": "EMP1001", "role": "MD", "name": "Suresh Iyer", "note": "MD: final approval + payment approver"}
+    {
+      "username": "emp_it",
+      "employee_code": "EMP1042",
+      "role": "USER",
+      "name": "Sneha Kulkarni",
+      "note": "IT employee"
+    },
+    {
+      "username": "emp_fin",
+      "employee_code": "EMP1108",
+      "role": "USER",
+      "name": "Arjun Singh",
+      "note": "Finance employee"
+    },
+    {
+      "username": "po_owner",
+      "employee_code": "EMP1201",
+      "role": "APPROVER",
+      "name": "Rahul Mehta",
+      "note": "PO process owner"
+    },
+    {
+      "username": "l1_hod",
+      "employee_code": "EMP1302",
+      "role": "APPROVER",
+      "name": "Priya Sharma",
+      "note": "L1 HOD"
+    },
+    {
+      "username": "l2_cfo",
+      "employee_code": "EMP1403",
+      "role": "APPROVER",
+      "name": "Kiran Rao",
+      "note": "L2 CFO"
+    },
+    {
+      "username": "finance",
+      "employee_code": "EMP1504",
+      "role": "FINANCE",
+      "name": "Neha Gupta",
+      "note": "FIN finance check, payment schedule, bank file, UTR, GL"
+    },
+    {
+      "username": "md",
+      "employee_code": "EMP1001",
+      "role": "MD",
+      "name": "Suresh Iyer",
+      "note": "L3 MD: large bills + payment approver"
+    }
   ],
   "chain": [
-    {"level": "L1", "username": "l1_owner", "above": "0.00"},
-    {"level": "L2", "username": "l2_hod", "above": "0.00"},
-    {"level": "L3", "username": "l3_fa", "above": "0.00"},
-    {"level": "MD", "username": "md", "above": "50000.00"}
+    {
+      "level": "PO",
+      "username": "po_owner",
+      "above": "0.00"
+    },
+    {
+      "level": "L1",
+      "username": "l1_hod",
+      "above": "0.00"
+    },
+    {
+      "level": "L2",
+      "username": "l2_cfo",
+      "above": "5000.00",
+      "up_to": "50000.00"
+    },
+    {
+      "level": "L3",
+      "username": "md",
+      "above": "50000.00"
+    },
+    {
+      "level": "FIN",
+      "username": "finance",
+      "above": "0.00"
+    }
   ],
   "replaced": {},
   "private_terms": []

@@ -67,8 +67,9 @@ class Settings(BaseSettings):
     FEATURE_TOTP_2FA: bool = False
     ENFORCE_GST_RULES: bool = False
     FEATURE_BILL_READER: bool = True
-    # band: ONE approver chosen by amount (L1 / L2 / L3 bands). chain: L1 -> L2 -> L3 in turn.
-    APPROVAL_ROUTING: Literal["band", "chain"] = "band"
+    # band: one approver by amount. chain: every level above its threshold. matrix: every level
+    # whose amount range (threshold, limit] covers the total, in order (the company matrix).
+    APPROVAL_ROUTING: Literal["band", "chain", "matrix"] = "band"
     # New expense pre-fill for everyone (FAR names, any case). Empty = the person's own
     # department / branch. The cost centre follows the department.
     DEFAULT_DEPARTMENT: str = ""

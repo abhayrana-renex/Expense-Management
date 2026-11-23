@@ -87,6 +87,7 @@ def summary(db: Session, principal: Principal, months: int = 6) -> dict[str, Any
     approved = case((Expense.status == "APPROVED", Expense.total_amount), else_=ZERO)
     by_department = db.execute(
         select(
+            Department.id,
             Department.name,
             func.count(),
             func.coalesce(func.sum(Expense.total_amount), 0),
@@ -94,7 +95,7 @@ def summary(db: Session, principal: Principal, months: int = 6) -> dict[str, Any
         )
         .join(Department, Department.id == Expense.department_id)
         .where(scope, Expense.status.notin_(("DRAFT", "CANCELLED", "REJECTED")))
-        .group_by(Department.name)
+        .group_by(Department.id, Department.name)
         .order_by(func.sum(Expense.total_amount).desc())
     ).all()
 
@@ -138,10 +139,11 @@ def summary(db: Session, principal: Principal, months: int = 6) -> dict[str, Any
             # Department-wise spend (submitted and approved), within the viewer's scope.
             "by_department": [
                 {
-                    "label": r[0],
-                    "count": r[1],
-                    "amount": _money(r[2]),
-                    "approved_amount": _money(r[3]),
+                    "id": r[0],
+                    "label": r[1],
+                    "count": r[2],
+                    "amount": _money(r[3]),
+                    "approved_amount": _money(r[4]),
                 }
                 for r in by_department
             ]

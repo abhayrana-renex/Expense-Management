@@ -5,9 +5,10 @@
 Who is who lives in backend/org_setup.local.json (gitignored - real names never go into the
 repository). Copy backend/org_setup.example.json to start; ORG_SETUP_FILE overrides the path.
 
-Approval (AP process flow, APPROVAL_ROUTING=chain), the same for every active department:
-  Initiator -> L1 Process owner -> L2 HOD -> L3 F&A ratification (corrects the bill)
-  -> MD final approval only above md_above.
+Approval matrix (APPROVAL_ROUTING=matrix), the same for every active department. Each chain
+entry approves when the total is above "above" and (if given) at most "up_to":
+  Initiator -> PO Process owner -> L1 HOD -> L2 CFO (5,001-50,000) or L3 MD (above 50,000)
+  -> FIN Finance check (verifies the full bill; sends it back if wrong) -> payment.
 Payment: Finance schedules -> payment approver (MD) approves -> bank file -> UTR ->
   general ledger. Every stage can push back one step; nothing is cancelled.
 
@@ -45,7 +46,8 @@ CONFIG = Path(os.environ.get("ORG_SETUP_FILE") or BACKEND / "org_setup.local.jso
 
 
 def _load_config(path: Path = CONFIG) -> tuple[list, tuple, dict]:
-    """(PEOPLE [(username, employee code, role)], CHAIN ((level, username, above)), REPLACED)."""
+    """(PEOPLE [(username, employee code, role)], CHAIN ((level, username, above, up_to)),
+    REPLACED). up_to is None for no upper limit."""
     if not path.exists():
         raise SystemExit(
             f"{path} not found. Copy backend/org_setup.example.json to "
@@ -53,7 +55,15 @@ def _load_config(path: Path = CONFIG) -> tuple[list, tuple, dict]:
         )
     cfg = json.loads(path.read_text(encoding="utf-8"))
     people = [(p["username"], str(p["employee_code"]), p["role"]) for p in cfg["people"]]
-    chain = tuple((c["level"], c["username"], str(Decimal(c["above"]))) for c in cfg["chain"])
+    chain = tuple(
+        (
+            c["level"],
+            c["username"],
+            str(Decimal(c["above"])),
+            str(Decimal(c["up_to"])) if c.get("up_to") is not None else None,
+        )
+        for c in cfg["chain"]
+    )
     names = {p[0] for p in people}
     missing = [c[1] for c in chain if c[1] not in names]
     if missing:
@@ -141,7 +151,10 @@ def _users(db: Session, actor: User | None, branch: Branch) -> dict[str, User]:
 def _rules(db: Session, actor: User | None, users: dict[str, User], levels) -> int:
     changed = 0
     for dept in db.execute(select(Department).where(Department.is_active)).scalars():
-        want = {code: (users[who], Decimal(above)) for code, who, above in CHAIN}
+        want = {
+            code: (users[who], Decimal(above), Decimal(up_to) if up_to else None)
+            for code, who, above, up_to in CHAIN
+        }
         current = list(
             db.execute(
                 select(ApprovalRule).where(
@@ -159,7 +172,7 @@ def _rules(db: Session, actor: User | None, users: dict[str, User], levels) -> i
                 target
                 and rule.approver_id == target[0].id
                 and rule.threshold_amount == target[1]
-                and rule.approval_limit is None
+                and rule.approval_limit == target[2]
             ):
                 want.pop(rule.level.code)
                 continue
@@ -174,13 +187,13 @@ def _rules(db: Session, actor: User | None, users: dict[str, User], levels) -> i
                 {"department": dept.name, "level": rule.level.code, "reason": "company chain"},
             )
         db.flush()
-        for code, (approver, threshold) in want.items():
+        for code, (approver, threshold, limit) in want.items():
             rule = ApprovalRule(
                 department_id=dept.id,
                 level_id=levels[code].id,
                 approver_id=approver.id,
                 threshold_amount=threshold,
-                approval_limit=None,
+                approval_limit=limit,
             )
             db.add(rule)
             db.flush()
@@ -196,6 +209,7 @@ def _rules(db: Session, actor: User | None, users: dict[str, User], levels) -> i
                     "level": code,
                     "approver": approver.username,
                     "above": str(threshold),
+                    "up_to": str(limit) if limit is not None else None,
                 },
             )
     return changed
@@ -276,8 +290,8 @@ def main() -> None:
         f"Chain set for every department ({rules} rule changes); {moved} in-flight step(s) "
         "moved to their replacement."
     )
-    if settings.APPROVAL_ROUTING != "chain":
-        print("NOTE: set APPROVAL_ROUTING=chain in backend/.env and restart the API.")
+    if settings.APPROVAL_ROUTING != "matrix":
+        print("NOTE: set APPROVAL_ROUTING=matrix in backend/.env and restart the API.")
 
 
 if __name__ == "__main__":

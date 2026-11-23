@@ -8,8 +8,19 @@ import { Empty, ErrorAlert, Field, Modal, PageHead, Skeleton, errorText,
   useToast } from "../../components/ui";
 import { inr } from "../../lib/format";
 import { useMaster } from "../../lib/masters";
+import { useAuth } from "../../auth/AuthContext";
+
+/** How a claim's route is built from these rules (server setting APPROVAL_ROUTING). */
+const ROUTING_TEXT: Record<string, string> = {
+  matrix: "Every level whose amount range covers the claim approves, in order - e.g. Process "
+    + "owner and HOD always, CFO for mid amounts, MD for large ones, then the Finance check. "
+    + "The amounts are the ones in the table.",
+  chain: "Every level whose 'claims above' amount the total exceeds approves, in order.",
+  band: "Each claim goes to ONE approver, picked by its amount band.",
+};
 
 export function Rules() {
+  const { me } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
   const depts = useMaster("departments");
@@ -32,7 +43,8 @@ export function Rules() {
   return (
     <>
       <PageHead title="Approval policies"
-        subtitle="Each claim goes to ONE approver, picked by its amount band (e.g. L1 up to ₹50,000 · L2 up to ₹1,00,000 · L3 above). Category-specific rules override the department's default."
+        subtitle={ROUTING_TEXT[me?.feature_flags.approval_routing ?? "band"]
+          + " Category-specific rules override the department's default."}
         actions={<button className="btn btn-primary" onClick={() => setCreating(true)}>
           <Plus size={16} />Add rule</button>} />
       <div className="card">
@@ -111,9 +123,9 @@ function CreateRule({ onClose }: { onClose: () => void }) {
           onChange={set("approver_id")}><option value="">Select</option>
           {approvers.data?.map((u) => <option key={u.id} value={u.id}>{u.full_name} ({u.role.code})</option>)}
         </Select></Field>
-        <Field label="Band: claims above (₹)" hint="e.g. 50000.00 for L2"><input className="input num"
+        <Field label="Applies to claims above (₹)" hint="e.g. 5000.00 for the CFO"><input className="input num"
           value={f.threshold_amount} onChange={set("threshold_amount")} /></Field>
-        <Field label="Band: up to and including (₹)" hint="Leave empty for no upper limit">
+        <Field label="Up to and including (₹)" hint="Leave empty for no upper limit">
           <input className="input num" value={f.approval_limit} placeholder="No limit"
             onChange={set("approval_limit")} /></Field>
       </div>

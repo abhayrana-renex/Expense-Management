@@ -117,13 +117,15 @@ SYSTEM_ROLES = {"USER", "APPROVER", "ADMIN", "FINANCE", "SUPER_ADMIN", "FA_CHECK
 # GST rate options for CGST / SGST / IGST (owner's list). Admins can add/deactivate rates.
 GST_RATES = ["3", "5", "7", "9", "12", "15", "18"]
 
-# AP process flow: Process owner -> HOD -> F&A / CFO ratification -> (above the HOD limit)
-# MD & CEO final approval. Which levels a department uses comes from its approval rules.
+# Approval matrix: Process owner -> L1 HOD -> L2 CFO (mid amounts) or L3 MD (large amounts)
+# -> Finance check, then payment. Which levels a bill needs, and the amounts, come from each
+# department's approval rules (Approval policies), never from code.
 LEVELS = [
-    ("L1", "Process owner", 1),
-    ("L2", "Head of department (HOD)", 2),
-    ("L3", "F&A / CFO ratification", 3),
-    ("MD", "MD & CEO - final approval", 4),
+    ("PO", "Process owner", 1),
+    ("L1", "Head of department (HOD)", 2),
+    ("L2", "CFO", 3),
+    ("L3", "MD & CEO", 4),
+    ("FIN", "Finance check", 5),
 ]
 
 

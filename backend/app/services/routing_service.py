@@ -5,9 +5,14 @@ Two policies (setting APPROVAL_ROUTING):
   (threshold_amount, approval_limit]; approval_limit NULL = no upper limit.
   e.g. L1 0-50,000 / L2 50,000-1,00,000 / L3 above 1,00,000.
 * "chain": every level whose threshold the total exceeds approves in turn (L1 -> L2 -> L3).
+* "matrix": every level whose range (threshold_amount, approval_limit] covers the total
+  approves in turn. The company matrix is set up this way, e.g.
+  PO 0-any / L1 HOD 0-any / L2 CFO 5,000-50,000 / L3 MD 50,000-any / FIN Finance check 0-any:
+  4,500 -> PO, HOD, Finance; 45,000 -> PO, HOD, CFO, Finance; 4,50,000 -> PO, HOD, MD, Finance.
 
 Maker is never the checker: if the chosen approver is the submitter, that level is
-SKIPPED and the expense goes to the next higher level's approver.
+SKIPPED. In band and chain the expense then goes to the next higher level's approver; in
+matrix the next level on the route simply takes it (nothing is added), unless none is left.
 """
 
 from dataclasses import dataclass
@@ -70,7 +75,9 @@ def plan_route(db: Session, expense: Expense) -> list[PlannedStep]:
             f"No approval rule is set up for department '{dept}'. An administrator has been "
             "notified; please try again once it is configured.",
         )
-    if settings.APPROVAL_ROUTING == "chain":
+    if settings.APPROVAL_ROUTING == "matrix":
+        required = [r for r in chosen if _covers(r, total)]
+    elif settings.APPROVAL_ROUTING == "chain":
         required = [r for r in chosen if total > r.threshold_amount]
         top = required[-1] if required else None
         if top is not None and top.approval_limit is not None and total > top.approval_limit:
@@ -95,11 +102,17 @@ def plan_route(db: Session, expense: Expense) -> list[PlannedStep]:
         raise AppError(
             422, "NO_APPROVAL_MAPPING", f"No approval level covers an amount of {money_str(total)}"
         )
-    return _with_maker_checker(chosen, required, expense.owner_id, dept)
+    return _with_maker_checker(
+        chosen, required, expense.owner_id, dept, settings.APPROVAL_ROUTING == "matrix"
+    )
 
 
 def _with_maker_checker(
-    chosen: list[ApprovalRule], required: list[ApprovalRule], owner_id: int, dept: object
+    chosen: list[ApprovalRule],
+    required: list[ApprovalRule],
+    owner_id: int,
+    dept: object,
+    matrix: bool = False,
 ) -> list[PlannedStep]:
     used: set[int] = {r.id for r in required}
     steps: list[PlannedStep] = []
@@ -113,6 +126,11 @@ def _with_maker_checker(
             continue
         # Maker is never the checker: skip this level and escalate to the next higher one.
         steps.append(PlannedStep(rule, "SKIPPED", "Approver is the submitter"))
+        later = any(
+            r.level.rank > rule.level.rank and r.approver_id != owner_id for r in required
+        )
+        if matrix and later:
+            continue  # the next level on the route takes it; nobody is added
         substitute = next(
             (
                 r

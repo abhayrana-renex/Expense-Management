@@ -31,7 +31,7 @@ export interface Me {
   permissions: Record<string, string>;
   must_change_password: boolean;
   password_expired: boolean;
-  feature_flags: Record<string, boolean>;
+  feature_flags: Record<string, boolean> & { approval_routing?: "band" | "chain" | "matrix" };
   password_policy: { min_length: number; history_count: number; expiry_days: number };
   /** Pre-fill for a new expense (portal defaults, else the user's own). */
   expense_defaults: { department_id: number | null; branch_id: number | null;
@@ -232,7 +232,8 @@ export interface Dashboard {
     by_status: { status: string; count: number; amount: Money }[];
     by_category: { label: string; count: number; amount: Money }[];
     by_branch: { label: string; count: number; amount: Money }[];
-    by_department?: { label: string; count: number; amount: Money; approved_amount: Money }[];
+    by_department?: { id: number; label: string; count: number; amount: Money;
+      approved_amount: Money }[];
   };
 }
 

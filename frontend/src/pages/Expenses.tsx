@@ -24,6 +24,9 @@ export function Expenses() {
   const status = params.get("status") ?? "";
   const q = params.get("q") ?? "";
   const scope = params.get("scope") ?? "mine";
+  const department = params.get("department") ?? ""; // from a Home pie slice
+  const departments = useMaster("departments");
+  const deptName = departments.data?.find((d) => String(d.id) === department)?.name;
   const [typeId, setTypeId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -31,9 +34,10 @@ export function Expenses() {
   const wide = can("expense.read") && scope === "all";
 
   const list = useQuery({
-    queryKey: ["expenses", status, q, scope, typeId, from, to, page],
+    queryKey: ["expenses", status, q, scope, department, typeId, from, to, page],
     queryFn: () => api.page<ExpenseSummary>("/expenses", {
-      mine: !wide, status, q, expense_type_id: typeId, date_from: from, date_to: to, page,
+      mine: !wide, status, q, department_id: department, expense_type_id: typeId,
+      date_from: from, date_to: to, page,
       page_size: PAGE_SIZE, sort: "created_at", order: "desc",
     }),
     placeholderData: (prev) => prev,
@@ -80,6 +84,11 @@ export function Expenses() {
           <span className="muted">to</span>
           <input className="input" type="date" value={to} aria-label="To date"
             onChange={(e) => { setTo(e.target.value); setPage(1); }} />
+          {department && (
+            <span className="tag filter-chip">{deptName ?? "Department"}
+              <button type="button" className="chip-x" aria-label="Show all departments"
+                onClick={() => set("department", "")}>×</button></span>
+          )}
         </div>
         {list.isLoading ? <Skeleton rows={6} /> : (list.data?.rows.length ?? 0) === 0 ? (
           <Empty title="No expenses found" icon={<Receipt size={22} />}

@@ -4570,7 +4570,14 @@
           },
           "feature_flags": {
             "additionalProperties": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string"
+                }
+              ]
             },
             "title": "Feature Flags",
             "type": "object"

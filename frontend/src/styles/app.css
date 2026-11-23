@@ -794,3 +794,31 @@ kbd { font-family: inherit; font-size: 10px; font-weight: 600; color: var(--ink-
   .page-head h1 { white-space: nowrap; }
   .page-head .actions { margin-left: 0; flex-wrap: wrap; width: 100%; }
 }
+
+/* Home: spend by department donut, with a clickable ranked list beside it */
+.dept-pie { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; align-items: center; }
+.dept-pie svg { width: 200px; height: 200px; }
+.pie-slice { cursor: pointer; stroke: var(--surface, #fff); stroke-width: 2; outline: none;
+  transition: opacity 0.12s; }
+.dept-pie svg:hover .pie-slice { opacity: 0.55; }
+.dept-pie svg .pie-slice:hover, .pie-slice:focus-visible { opacity: 1; }
+.pie-total { font-size: 15px; font-weight: 700; fill: var(--ink-900); }
+.pie-sub { font-size: 9px; fill: var(--ink-500); }
+.pie-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-width: 620px; }
+.pie-row { width: 100%; display: grid; grid-template-columns: 12px minmax(0, 1fr) 44px 84px;
+  align-items: center; gap: 10px; padding: 7px 8px; border: 0; border-radius: var(--r-md);
+  background: transparent; font: inherit; color: var(--ink-900); text-align: left; cursor: pointer; }
+.pie-row:hover { background: var(--grey-50); }
+.pie-swatch { width: 12px; height: 12px; border-radius: 3px; }
+.pie-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
+.pie-pct, .pie-row .amount { text-align: right; font-size: var(--fs-sm); }
+.filter-chip { align-self: center; background: var(--brand-50); color: var(--brand-700); }
+@media (max-width: 600px) {
+  .dept-pie { grid-template-columns: 1fr; justify-items: center; }
+  .pie-legend { width: 100%; }
+}
+/* Phone: two-up card rows (Home inbox / recent) stack. */
+@media (max-width: 760px) { .grid-2 { grid-template-columns: minmax(0, 1fr); } }
+/* Expense numbers never break across lines. */
+.cell-main.mono { white-space: nowrap; }
+@media (max-width: 600px) { .tbl .avatar-sm { display: none; } }
