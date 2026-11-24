@@ -264,8 +264,7 @@ export function ExpenseDetail() {
               <div className="kpi-foot">{inr(e.total_taxable)} + GST {inr(e.total_tax)}</div></div>
             <div className="card kpi"><div className="kpi-label">Category</div>
               <div className="kpi-value" style={{ fontSize: 16 }}>{e.expense_type.name}</div>
-              <div className="kpi-foot">{e.cost_centre ? `Cost centre ${e.cost_centre.code}`
-                : "No cost centre"}</div></div>
+              <div className="kpi-foot">{e.department.name}</div></div>
             <div className="card kpi"><div className="kpi-label">Submitted</div>
               <div className="kpi-value" style={{ fontSize: 16 }}>{date(e.submitted_at)}</div>
               <div className="kpi-foot">{e.approved_at ? `Approved ${date(e.approved_at)}`

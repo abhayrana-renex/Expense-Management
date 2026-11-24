@@ -78,7 +78,6 @@ class ExpenseIn(BaseModel):
         description="Department the expense is booked to (FAR master); defaults to the "
         "user's department. Approval routing follows this department's rules.",
     )
-    cost_centre_id: int | None = None
     bill_month_id: int | None = None
     bill_period_start: date | None = Field(None, description="Bill duration: from (inclusive)")
     bill_period_end: date | None = Field(None, description="Bill duration: to (inclusive)")
@@ -197,7 +196,6 @@ class ExpenseSummaryOut(ORMModel):
     department: Ref
     branch: Ref
     expense_type: Ref
-    cost_centre: Ref | None
     bill_month: BillMonthRef | None
     bill_period_start: date | None = None
     bill_period_end: date | None = None
@@ -229,7 +227,6 @@ class ExpenseOut(ExpenseSummaryOut):
     closed_at: datetime | None
     snapshot_department_name: str | None
     snapshot_branch_name: str | None
-    snapshot_cost_centre_code: str | None
     snapshot_expense_type_name: str | None
     po_number: str | None
     approval_by_name: str | None

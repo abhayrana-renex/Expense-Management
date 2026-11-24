@@ -15,7 +15,6 @@ from app.models import (
     BillExtraction,
     BillMonth,
     Branch,
-    CostCentre,
     Department,
     Expense,
     ExpenseDocument,
@@ -139,14 +138,12 @@ def _apply_header(db: Session, expense: Expense, data: ExpenseIn, principal: Pri
     _require_active(db, Department, department_id, "Department")
     expense_type = _require_active(db, ExpenseType, data.expense_type_id, "Expense type")
     _require_active(db, Branch, branch_id, "Branch")
-    _require_active(db, CostCentre, data.cost_centre_id, "Cost centre")
     _require_active(db, BillMonth, data.bill_month_id, "Bill month")
     expense.title = (data.title or "").strip() or _label(db, data, expense_type.name)
     expense.purpose = data.purpose
     expense.expense_type_id = data.expense_type_id
     expense.branch_id = branch_id
     expense.department_id = department_id
-    expense.cost_centre_id = data.cost_centre_id
     expense.bill_month_id = data.bill_month_id
     expense.bill_period_start = data.bill_period_start
     expense.bill_period_end = data.bill_period_end
@@ -483,7 +480,6 @@ def update(db: Session, principal: Principal, expense_id: int, data: ExpenseUpda
 def _snapshot(expense: Expense) -> None:
     expense.snapshot_department_name = expense.department.name
     expense.snapshot_branch_name = expense.branch.name
-    expense.snapshot_cost_centre_code = expense.cost_centre.code if expense.cost_centre else None
     expense.snapshot_expense_type_name = expense.expense_type.name
     for item in expense.items:
         item.snapshot_vendor_name = item.vendor.name if item.vendor else item.supplier_name

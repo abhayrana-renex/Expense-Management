@@ -71,7 +71,6 @@ export function ExpenseForm() {
   const types = useMaster("expense-types");
   const branches = useMaster("branches");
   const departments = useMaster("departments");
-  const centres = useMaster("cost-centres");
   const vendors = useMaster("vendors");
   const rates = useQuery({ queryKey: ["gst-rates"], staleTime: 300_000,
     queryFn: () => api.get<GstRate[]>("/masters/gst-rates") });
@@ -92,7 +91,6 @@ export function ExpenseForm() {
   const [purpose, setPurpose] = useState("");
   const [typeId, setTypeId] = useState("");
   const [branchId, setBranchId] = useState("");
-  const [centreId, setCentreId] = useState("");
   /** Kept only so older claims keep their bill month when edited (no longer on the form). */
   const [monthId, setMonthId] = useState("");
   const [deptId, setDeptId] = useState("");
@@ -118,7 +116,7 @@ export function ExpenseForm() {
     setBaseDocs(e.base_documents.map((d) => ({ id: d.id, name: d.original_filename,
       content_type: d.content_type })));
     setTitle(e.title); setPurpose(e.purpose ?? ""); setTypeId(String(e.expense_type.id));
-    setBranchId(String(e.branch.id)); setCentreId(e.cost_centre ? String(e.cost_centre.id) : "");
+    setBranchId(String(e.branch.id));
     setMonthId(e.bill_month ? String(e.bill_month.id) : "");
     setDeptId(String(e.department.id));
     setPeriodFrom(e.bill_period_start ?? ""); setPeriodTo(e.bill_period_end ?? "");
@@ -139,8 +137,6 @@ export function ExpenseForm() {
     setBillType(src.bill_type ?? "PO"); setDetails(detailsOf(src));
     setTitle(""); setPurpose(src.purpose ?? "");
     setTypeId(String(src.expense_type.id)); setBranchId(String(src.branch.id));
-    setCentreId(src.cost_centre ? String(src.cost_centre.id) : "");
-    centreTouched.current = true; // a copy keeps its own cost centre
     setDeptId(String(src.department.id));
     setLines(src.items.map((i) => ({
       ...lineFromItem(i), key: crypto.randomUUID(), id: undefined, docs: [], document_ids: [],
@@ -148,7 +144,7 @@ export function ExpenseForm() {
     })));
   }, [editing, location.state]);
 
-  // New expense: department, branch and cost centre start from the portal defaults (IT /
+  // New expense: department and branch start from the portal defaults (IT /
   // Gurgaon today, set by the admin in the server settings), else the person's own.
   const defaults = me?.expense_defaults;
   useEffect(() => {
@@ -162,15 +158,6 @@ export function ExpenseForm() {
     const dept = defaults?.department_id ?? me?.user.department?.id;
     if (!deptId && dept) setDeptId(String(dept));
   }, [editing, deptId, me, defaults]);
-
-  // The cost centre follows the department (its linked cost centre) until the person picks
-  // one themselves.
-  const centreTouched = useRef(false);
-  useEffect(() => {
-    if (editing || centreTouched.current || !deptId || !centres.data) return;
-    const linked = centres.data.find((c) => String(c.department_id ?? "") === deptId);
-    setCentreId(linked ? String(linked.id) : "");
-  }, [editing, deptId, centres.data]);
 
   // ---- New expense kept while the person is on other pages (lib/expenseDraft.ts) ----
   const [restoredAt, setRestoredAt] = useState<number | null>(null);
@@ -189,10 +176,9 @@ export function ExpenseForm() {
     titleTouched.current = d.touched.title;
     purposeTouched.current = d.touched.purpose;
     periodTouched.current = d.touched.period;
-    centreTouched.current = true;
     setBillType(d.billType as BillType); setDetails({ ...NO_DETAILS, ...d.details });
     setBaseDocs(d.baseDocs); setTitle(d.title); setPurpose(d.purpose); setTypeId(d.typeId);
-    setBranchId(d.branchId); setCentreId(d.centreId); setDeptId(d.deptId);
+    setBranchId(d.branchId); setDeptId(d.deptId);
     setPeriodFrom(d.periodFrom); setPeriodTo(d.periodTo); setPeriodSource(d.periodSource);
     setManual(d.manual);
     setContractExtra({ ...NO_EXTRA, ...(d.contractExtra ?? {}) });
@@ -220,15 +206,15 @@ export function ExpenseForm() {
           || l.bill_number || l.supplier_name));
       if (!hasContent) { clearDraft(uid); return; }
       saveDraft(uid, {
-        billType, details: { ...details }, baseDocs, title, purpose, typeId, branchId, centreId,
+        billType, details: { ...details }, baseDocs, title, purpose, typeId, branchId,
         deptId, periodFrom, periodTo, periodSource, manual, lines,
         contractId: contract?.id ?? null, contractExtra,
         touched: { title: titleTouched.current, purpose: purposeTouched.current,
-          period: periodTouched.current, centre: centreTouched.current },
+          period: periodTouched.current },
       });
     }, 400);
     return () => clearTimeout(t);
-  }, [editing, uid, billType, details, baseDocs, title, purpose, typeId, branchId, centreId,
+  }, [editing, uid, billType, details, baseDocs, title, purpose, typeId, branchId,
     deptId, periodFrom, periodTo, periodSource, manual, lines, contract, contractExtra]);
 
   /** Contract: claim one period of the stored contract (bill optional). */
@@ -268,9 +254,9 @@ export function ExpenseForm() {
   function startOver() {
     if (uid) clearDraft(uid);
     titleTouched.current = false; purposeTouched.current = false;
-    periodTouched.current = false; centreTouched.current = false;
+    periodTouched.current = false;
     setBillType("PO"); setDetails(NO_DETAILS); setBaseDocs([]); setTitle(""); setPurpose("");
-    setTypeId(""); setBranchId(""); setCentreId(""); setDeptId(""); setPeriodFrom("");
+    setTypeId(""); setBranchId(""); setDeptId(""); setPeriodFrom("");
     setPeriodTo(""); setPeriodSource(""); setManual(false); setLines([blankLine()]);
     setIssues([]); setError(null); setRestoredAt(null);
     setContract(null); setContractExtra(NO_EXTRA);
@@ -435,7 +421,6 @@ export function ExpenseForm() {
     return {
       title: title.trim() || null, purpose: purpose || null, expense_type_id: Number(typeId),
       branch_id: branchId ? Number(branchId) : null,
-      cost_centre_id: centreId ? Number(centreId) : null,
       bill_month_id: monthId ? Number(monthId) : null,
       department_id: deptId ? Number(deptId) : null,
       bill_period_start: periodFrom || null,
@@ -581,6 +566,7 @@ export function ExpenseForm() {
   const showLines = hasBills || manual;
   const claimFields = (
     <>
+      <div className="field-trio">
       <Field label="Category">
         <Select className="select" value={typeId} onChange={(e) => setTypeId(e.target.value)}>
           <option value="">Select category</option>
@@ -599,13 +585,7 @@ export function ExpenseForm() {
           {branches.data?.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.code})</option>)}
         </Select>
       </Field>
-      <Field label="Cost centre" hint="Optional">
-        <Select className="select" value={centreId}
-          onChange={(e) => { centreTouched.current = true; setCentreId(e.target.value); }}>
-          <option value="">None</option>
-          {centres.data?.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
-        </Select>
-      </Field>
+      </div>
       <Field label="Bill period from" hint={periodSource || "Optional - billing / service period"}>
         <input className="input" type="date" value={periodFrom}
           onChange={(e) => {

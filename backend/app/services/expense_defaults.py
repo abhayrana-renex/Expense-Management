@@ -1,16 +1,15 @@
-"""What a new expense starts with: department, branch and cost centre.
+"""What a new expense starts with: department and branch.
 
 DEFAULT_DEPARTMENT / DEFAULT_BRANCH (FAR names, any case) apply to everyone; when unset, or
-when FAR no longer has that name Active, the person's own department / branch is used. The
-cost centre is the Active one linked to that department. All of it is only pre-filled: the
-person can change every value, and the server validates what is submitted as usual.
+when FAR no longer has that name Active, the person's own department / branch is used. Both
+are only pre-filled: the person can change them, and the server validates what is submitted.
 """
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import Branch, CostCentre, Department, User
+from app.models import Branch, Department, User
 
 
 def _active_by_name(db: Session, model: type, name: str) -> int | None:
@@ -24,17 +23,6 @@ def _active_by_name(db: Session, model: type, name: str) -> int | None:
     ).scalar()
 
 
-def cost_centre_for(db: Session, department_id: int | None) -> int | None:
-    if department_id is None:
-        return None
-    return db.execute(
-        select(CostCentre.id)
-        .where(CostCentre.department_id == department_id, CostCentre.is_active.is_(True))
-        .order_by(CostCentre.code)
-        .limit(1)
-    ).scalar()
-
-
 def for_user(db: Session, user: User) -> dict[str, int | None]:
     department_id = (
         _active_by_name(db, Department, settings.DEFAULT_DEPARTMENT) or user.effective_department_id
@@ -43,5 +31,4 @@ def for_user(db: Session, user: User) -> dict[str, int | None]:
     return {
         "department_id": department_id,
         "branch_id": branch_id,
-        "cost_centre_id": cost_centre_for(db, department_id),
     }

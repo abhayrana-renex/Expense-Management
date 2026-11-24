@@ -29,14 +29,13 @@ export interface ExpenseDraft {
     purpose: string;
     typeId: string;
     branchId: string;
-    centreId: string;
     deptId: string;
     periodFrom: string;
     periodTo: string;
     periodSource: string;
     manual: boolean;
     lines: Line[];
-    touched: { title: boolean; purpose: boolean; period: boolean; centre: boolean };
+    touched: { title: boolean; purpose: boolean; period: boolean };
     /** CONTRACT: the stored contract picked, and the first-time payment details. */
     contractId?: number | null;
     contractExtra?: ContractExtra;

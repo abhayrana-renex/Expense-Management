@@ -15,7 +15,6 @@ from app.core.deps import Principal
 from app.models import (
     BillMonth,
     Branch,
-    CostCentre,
     Department,
     Expense,
     ExpenseItem,
@@ -34,7 +33,6 @@ REPORT_COLUMNS: list[tuple[str, str]] = [
     ("employee_name", "Employee"),
     ("department", "Department"),
     ("branch", "Branch"),
-    ("cost_centre", "Cost Centre"),
     ("expense_type", "Expense Type"),
     ("bill_month", "Bill Month"),
     ("status", "Status"),
@@ -62,7 +60,6 @@ DUMP_COLUMNS: list[tuple[str, str]] = [
     ("employee_name", "Employee"),
     ("department", "Department"),
     ("branch", "Branch"),
-    ("cost_centre", "Cost Centre"),
     ("expense_type", "Expense Type"),
     ("bill_month", "Bill Month"),
     ("line_no", "Line"),
@@ -93,7 +90,6 @@ def report_rows_query(principal: Principal, **filters: Any) -> Select:
             User.full_name.label("employee_name"),
             func.coalesce(Expense.snapshot_department_name, Department.name).label("department"),
             func.coalesce(Expense.snapshot_branch_name, Branch.name).label("branch"),
-            func.coalesce(Expense.snapshot_cost_centre_code, CostCentre.code).label("cost_centre"),
             func.coalesce(Expense.snapshot_expense_type_name, ExpenseType.name).label(
                 "expense_type"
             ),
@@ -111,7 +107,6 @@ def report_rows_query(principal: Principal, **filters: Any) -> Select:
         .join(Department, Department.id == Expense.department_id)
         .join(Branch, Branch.id == Expense.branch_id)
         .join(ExpenseType, ExpenseType.id == Expense.expense_type_id)
-        .outerjoin(CostCentre, CostCentre.id == Expense.cost_centre_id)
         .outerjoin(BillMonth, BillMonth.id == Expense.bill_month_id)
         .outerjoin(Approver, Approver.id == Expense.current_approver_id)
     )
@@ -144,7 +139,6 @@ def dump_rows_query(principal: Principal, **filters: Any) -> Select:
             User.full_name.label("employee_name"),
             func.coalesce(Expense.snapshot_department_name, Department.name).label("department"),
             func.coalesce(Expense.snapshot_branch_name, Branch.name).label("branch"),
-            func.coalesce(Expense.snapshot_cost_centre_code, CostCentre.code).label("cost_centre"),
             func.coalesce(Expense.snapshot_expense_type_name, ExpenseType.name).label(
                 "expense_type"
             ),
@@ -171,7 +165,6 @@ def dump_rows_query(principal: Principal, **filters: Any) -> Select:
         .join(Department, Department.id == Expense.department_id)
         .join(Branch, Branch.id == Expense.branch_id)
         .join(ExpenseType, ExpenseType.id == Expense.expense_type_id)
-        .outerjoin(CostCentre, CostCentre.id == Expense.cost_centre_id)
         .outerjoin(BillMonth, BillMonth.id == Expense.bill_month_id)
         .order_by(Expense.id, ExpenseItem.line_no)
     )

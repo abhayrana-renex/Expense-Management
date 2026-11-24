@@ -1649,114 +1649,6 @@
         "title": "ContractSchedule",
         "type": "object"
       },
-      "CostCentreIn": {
-        "properties": {
-          "code": {
-            "maxLength": 30,
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9._/-]+$",
-            "title": "Code",
-            "type": "string"
-          },
-          "department_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Department Id"
-          },
-          "name": {
-            "maxLength": 150,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "name"
-        ],
-        "title": "CostCentreIn",
-        "type": "object"
-      },
-      "CostCentreOut": {
-        "properties": {
-          "code": {
-            "title": "Code",
-            "type": "string"
-          },
-          "department_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Department Id"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "is_active": {
-            "title": "Is Active",
-            "type": "boolean"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "shared_with": {
-            "title": "Shared With",
-            "type": "null"
-          }
-        },
-        "required": [
-          "id",
-          "code",
-          "name",
-          "is_active",
-          "department_id"
-        ],
-        "title": "CostCentreOut",
-        "type": "object"
-      },
-      "CostCentreUpdate": {
-        "properties": {
-          "department_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Department Id"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "maxLength": 150,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          }
-        },
-        "title": "CostCentreUpdate",
-        "type": "object"
-      },
       "DecisionIn": {
         "properties": {
           "note": {
@@ -2609,17 +2501,6 @@
             ],
             "title": "Contract Value"
           },
-          "cost_centre_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cost Centre Id"
-          },
           "department_id": {
             "anyOf": [
               {
@@ -3341,16 +3222,6 @@
             ],
             "title": "Contract Value"
           },
-          "cost_centre": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Ref"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -3562,17 +3433,6 @@
             ],
             "title": "Snapshot Branch Name"
           },
-          "snapshot_cost_centre_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Snapshot Cost Centre Code"
-          },
           "snapshot_department_name": {
             "anyOf": [
               {
@@ -3652,7 +3512,6 @@
           "department",
           "branch",
           "expense_type",
-          "cost_centre",
           "bill_month",
           "current_level",
           "current_approver",
@@ -3672,7 +3531,6 @@
           "closed_at",
           "snapshot_department_name",
           "snapshot_branch_name",
-          "snapshot_cost_centre_code",
           "snapshot_expense_type_name",
           "po_number",
           "approval_by_name",
@@ -3751,16 +3609,6 @@
           },
           "branch": {
             "$ref": "#/components/schemas/Ref"
-          },
-          "cost_centre": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Ref"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "created_at": {
             "format": "date-time",
@@ -3892,7 +3740,6 @@
           "department",
           "branch",
           "expense_type",
-          "cost_centre",
           "bill_month",
           "current_level",
           "current_approver",
@@ -4326,17 +4173,6 @@
               }
             ],
             "title": "Contract Value"
-          },
-          "cost_centre_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cost Centre Id"
           },
           "department_id": {
             "anyOf": [
@@ -4864,7 +4700,7 @@
                 }
               ]
             },
-            "description": "Pre-fill for a new expense: department_id, branch_id, cost_centre_id (DEFAULT_DEPARTMENT / DEFAULT_BRANCH, else the user's own; the cost centre linked to that department). The user can change each one.",
+            "description": "Pre-fill for a new expense: department_id, branch_id (DEFAULT_DEPARTMENT / DEFAULT_BRANCH, else the user's own). The user can change each one.",
             "title": "Expense Defaults",
             "type": "object"
           },
@@ -11788,542 +11624,6 @@
         "summary": "Deactivate branch",
         "tags": [
           "Masters: Branch"
-        ]
-      }
-    },
-    "/api/masters/cost-centres": {
-      "get": {
-        "description": "Portal-only master. Dropdowns should pass is_active=true. Sort by: code, name, created_at",
-        "operationId": "list_cost_centres",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "q",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maxLength": 100,
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Q"
-            }
-          },
-          {
-            "description": "Omit for all",
-            "in": "query",
-            "name": "is_active",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Omit for all",
-              "title": "Is Active"
-            }
-          },
-          {
-            "in": "query",
-            "name": "page",
-            "required": false,
-            "schema": {
-              "default": 1,
-              "minimum": 1,
-              "title": "Page",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "page_size",
-            "required": false,
-            "schema": {
-              "default": 25,
-              "maximum": 200,
-              "minimum": 1,
-              "title": "Page Size",
-              "type": "integer"
-            }
-          },
-          {
-            "description": "Field to sort by (see endpoint description)",
-            "in": "query",
-            "name": "sort",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Field to sort by (see endpoint description)",
-              "title": "Sort"
-            }
-          },
-          {
-            "in": "query",
-            "name": "order",
-            "required": false,
-            "schema": {
-              "default": "desc",
-              "enum": [
-                "asc",
-                "desc"
-              ],
-              "title": "Order",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/CostCentreOut"
-                  },
-                  "title": "Response List Cost Centres",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not authenticated"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden or password change required"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Validation error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "List cost centres",
-        "tags": [
-          "Masters: Cost centre"
-        ]
-      },
-      "post": {
-        "description": "Portal-only master.",
-        "operationId": "create_cost_centres",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CostCentreIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CostCentreOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not authenticated"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden or password change required"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "DUPLICATE (in the portal or FAR)"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Validation error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Create cost centre",
-        "tags": [
-          "Masters: Cost centre"
-        ]
-      }
-    },
-    "/api/masters/cost-centres/{item_id}": {
-      "get": {
-        "operationId": "get_cost_centres",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "item_id",
-            "required": true,
-            "schema": {
-              "title": "Item Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CostCentreOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not authenticated"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden or password change required"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Validation error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Get cost centre",
-        "tags": [
-          "Masters: Cost centre"
-        ]
-      },
-      "patch": {
-        "description": "Portal-only master.",
-        "operationId": "update_cost_centres",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "item_id",
-            "required": true,
-            "schema": {
-              "title": "Item Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CostCentreUpdate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CostCentreOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not authenticated"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden or password change required"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "DUPLICATE (in the portal or FAR)"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Validation error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Update cost centre",
-        "tags": [
-          "Masters: Cost centre"
-        ]
-      }
-    },
-    "/api/masters/cost-centres/{item_id}/activate": {
-      "post": {
-        "operationId": "activate_cost_centres",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "item_id",
-            "required": true,
-            "schema": {
-              "title": "Item Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CostCentreOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not authenticated"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden or password change required"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "DUPLICATE (in the portal or FAR)"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Validation error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Activate cost centre",
-        "tags": [
-          "Masters: Cost centre"
-        ]
-      }
-    },
-    "/api/masters/cost-centres/{item_id}/deactivate": {
-      "post": {
-        "description": "Portal-only master. Never deletes: expenses (and FAR assets) keep their reference; FAR rows get status Inactive.",
-        "operationId": "deactivate_cost_centres",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "item_id",
-            "required": true,
-            "schema": {
-              "title": "Item Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CostCentreOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not authenticated"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden or password change required"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "DUPLICATE (in the portal or FAR)"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Validation error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Deactivate cost centre",
-        "tags": [
-          "Masters: Cost centre"
         ]
       }
     },

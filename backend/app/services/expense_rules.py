@@ -345,8 +345,6 @@ def validate_for_submit(db: Session, expense: Expense) -> list[ValidationIssue]:
         block("INACTIVE_MASTER", "Expense type is inactive", field="expense_type_id")
     if not expense.branch.is_active:
         block("INACTIVE_MASTER", "Branch is inactive", field="branch_id")
-    if expense.cost_centre and not expense.cost_centre.is_active:
-        block("INACTIVE_MASTER", "Cost centre is inactive", field="cost_centre_id")
     if expense.bill_month and not (expense.bill_month.is_open and expense.bill_month.is_active):
         block(
             "BILL_MONTH_CLOSED",

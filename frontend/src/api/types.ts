@@ -36,8 +36,7 @@ export interface Me {
   /** Pre-fill for a new expense (portal defaults, else the user's own). */
   /** Takes part in approvals; initiators who only raise bills don't see Approvals. */
   approves?: boolean;
-  expense_defaults: { department_id: number | null; branch_id: number | null;
-    cost_centre_id: number | null };
+  expense_defaults: { department_id: number | null; branch_id: number | null };
 }
 
 export interface TokenResponse {
@@ -90,7 +89,6 @@ export interface ExpenseSummary {
   department: Ref;
   branch: Ref;
   expense_type: Ref;
-  cost_centre: Ref | null;
   bill_month: { id: number; code: string; label: string } | null;
   bill_period_start?: string | null;
   bill_period_end?: string | null;

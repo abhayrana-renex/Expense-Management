@@ -22,7 +22,7 @@ a change made in either application is visible in the other immediately.
 | Vendors | `core.partners` (Vendor + Contractor) | `name`, case-insensitive | `vendor_profiles`: GSTIN, PAN, MSME, Udyam |
 | Employees | `core.assignees` where `type='employee'` | `employee_code` | – |
 | Logins | portal `expense.users` (own passwords, lockout, roles) | linked 1:1 to a FAR employee via `assignee_id` | – |
-| Cost centres, categories, bill months, approval rules | portal only | `code` | FAR has none of these |
+| Categories, bill months, approval rules | portal only | `code` | FAR has none of these (cost centres are no longer used; the old table is kept for history) |
 
 FAR's `core.users` (FAR logins) and `far.*` tables are never touched by the portal.
 

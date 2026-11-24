@@ -158,19 +158,6 @@ class LocalOut(ORMModel):
     shared_with: None = None
 
 
-class CostCentreIn(_Code):
-    department_id: int | None = None
-
-
-class CostCentreUpdate(_Trim):
-    name: str | None = Field(None, min_length=1, max_length=150)
-    department_id: int | None = None
-
-
-class CostCentreOut(LocalOut):
-    department_id: int | None
-
-
 class ExpenseTypeIn(_Code):
     description: str | None = Field(None, max_length=255)
     requires_bill: bool = True

@@ -1,5 +1,5 @@
 """Idempotent seeds. Reference data (roles, permissions, levels, bill months, super admin)
-is separate from demo data (categories, cost centres, demo logins, approval rules).
+is separate from demo data (categories, demo logins, approval rules).
 
 Departments, branches, vendors and employees are FAR's shared masters: seeds NEVER insert
 into them. Demo data only *reads* FAR's existing rows to attach logins and rules."""
@@ -16,7 +16,6 @@ from app.models import (
     ApprovalLevel,
     ApprovalRule,
     Branch,
-    CostCentre,
     Department,
     ExpenseType,
     GstRate,
@@ -267,14 +266,6 @@ def seed_demo(db: Session) -> None:
 
     for code, name, bill in EXPENSE_TYPES:
         _get_or_create(db, ExpenseType, {"code": code}, name=name, requires_bill=bill)
-    for dept in depts[:5]:
-        _get_or_create(
-            db,
-            CostCentre,
-            {"code": f"CC-{dept.id:03d}"},
-            name=f"{dept.name.title()} cost centre",
-            department_id=dept.id,
-        )
 
     roles = {r.code: r for r in db.execute(select(Role)).scalars()}
     pw_hash = hash_password(settings.SEED_DEMO_PASSWORD)

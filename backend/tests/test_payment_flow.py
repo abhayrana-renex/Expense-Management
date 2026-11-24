@@ -132,12 +132,12 @@ def test_paid_downloads_and_general_ledger(api):
         "finadmin", "/api/payments/general-ledger", params={"date_from": today, "date_to": today}
     )
     ws = load_workbook(io.BytesIO(gl.content)).active
-    rows = [r for r in ws.iter_rows(min_row=2, values_only=True) if r and r[8] == exp["expense_no"]]
+    rows = [r for r in ws.iter_rows(min_row=2, values_only=True) if r and r[7] == exp["expense_no"]]
     ledgers = {(r[2], r[3]): (Decimal(str(r[4])), Decimal(str(r[5]))) for r in rows}
     assert ledgers[("Journal", "Travel expense")] == (Decimal("1000"), Decimal("0"))
     assert ledgers[("Journal", "Input CGST")] == (Decimal("90"), Decimal("0"))
     assert ledgers[("Journal", "Sundry creditors - Paperworks Stationers")][1] == Decimal("1180")
     assert ledgers[("Payment", "Bank - NEFT")] == (Decimal("0"), Decimal("1180"))
-    assert all(r[10] == "HDFC000123" for r in rows if r[2] == "Payment")
+    assert all(r[9] == "HDFC000123" for r in rows if r[2] == "Payment")
     total = next(r for r in ws.iter_rows(values_only=True) if r and r[3] == "TOTAL")
     assert Decimal(str(total[4])) == Decimal(str(total[5]))

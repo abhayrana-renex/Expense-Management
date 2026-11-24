@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     # whose amount range (threshold, limit] covers the total, in order (the company matrix).
     APPROVAL_ROUTING: Literal["band", "chain", "matrix"] = "band"
     # New expense pre-fill for everyone (FAR names, any case). Empty = the person's own
-    # department / branch. The cost centre follows the department.
+    # department / branch.
     DEFAULT_DEPARTMENT: str = ""
     DEFAULT_BRANCH: str = ""
     # Bulk approve is only offered for claims at or below this amount (and with no warnings).

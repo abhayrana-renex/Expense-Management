@@ -897,3 +897,9 @@ kbd { font-family: inherit; font-size: 10px; font-weight: 600; color: var(--ink-
   .dept-pie svg, .pie-total, .pie-sub, .pie-li, .bar, .hbar > span { animation: none; }
   .pie-slice { transition: none; }
 }
+
+/* Expense form: Category, Department and Branch side by side on one row. */
+.field-trio { grid-column: 1 / -1; display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 9px 12px; align-items: start; }
+@media (max-width: 600px) { .field-trio { grid-template-columns: minmax(0, 1fr); } }

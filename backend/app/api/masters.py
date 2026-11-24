@@ -1,5 +1,5 @@
 """Master data endpoints. FAR-shared masters (departments, branches, vendors, employees) are
-read and written in FAR's own tables; cost centres, categories, bill months and approval
+read and written in FAR's own tables; categories, bill months and approval
 rules are portal-only."""
 
 from decimal import Decimal

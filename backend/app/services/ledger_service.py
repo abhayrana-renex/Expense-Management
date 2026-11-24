@@ -34,7 +34,6 @@ COLUMNS = [
     "Debit",
     "Credit",
     "Department",
-    "Cost centre",
     "Claim no.",
     "Bill no.",
     "UTR",
@@ -62,7 +61,6 @@ def entries(
     rows: list[list[Any]] = []
     for e in db.execute(stmt.order_by(Expense.paid_on, Expense.id)).unique().scalars():
         dept = e.snapshot_department_name or e.department.name
-        cc = e.snapshot_cost_centre_code or (e.cost_centre.code if e.cost_centre else "")
         head = f"{e.snapshot_expense_type_name or e.expense_type.name} expense"
         bills = ", ".join(i.bill_number for i in e.items if i.bill_number)
         booked_on = (e.approved_at.date() if e.approved_at else e.paid_on).isoformat()
@@ -76,7 +74,7 @@ def entries(
         for i in e.items:
             payable[_payee(i, e.owner.full_name)] += i.total_amount
 
-        ctx = (dept, cc, e.expense_no, bills)
+        ctx = (dept, e.expense_no, bills)
 
         def line(
             d: str,
